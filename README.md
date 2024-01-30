@@ -43,8 +43,10 @@ void bar() {
 }
 ```
 
-You can call private member functions and static private functions.
-You can also access static private variables, if they are defined out-of-class.
+You can call private member functions and static private functions.  
+You can also access static private variables, if they are defined out-of-class.  
+You can invoke private constructors and destructor too.  
+You can invoke private member functions with they default arguments.  
 For DETAILED USAGE and EXAMPLES, please take a look [test.cpp](https://github.com/schaumb/access_private/blob/master/test/test.cpp) and [new_tests.cpp](https://github.com/schaumb/access_private/blob/master/test/new_tests.cpp)!
 
 # How does it work?
@@ -58,7 +60,7 @@ References:
 # Limitations
 
 * We cannot access private members that are references. (See this [issue](https://github.com/martong/access_private/issues/12).)
-* On MSVC, we cannot call private constructors / destructors and we cannot access the default arguments of the private functions. (See this [issue](http://tinyurl.com/msvcconstructor).)
+* On MSVC, we cannot call private constructors / destructors, and we cannot access the default arguments of the private functions. (See this [issue](http://tinyurl.com/msvcconstructor).)
 * We have a link time error in case of only in-class declared `const static` variables if used as reference/pointer (or in debug build). That's because we'd take the address of that, and if that is not defined (i.e the compiler do a compile-time insert of the const value), we'd have an undefined symbol.
 
 # Compilers

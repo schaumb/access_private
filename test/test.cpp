@@ -57,7 +57,7 @@ class B {
 
 public:
   class C {
-    int m_i = 3;
+    int m_i = 4;
   };
 };
 } // NS
@@ -75,9 +75,9 @@ void test_access_private_in_class_in_namespace() {
 
 
 void test_access_private_in_nested_class() {
-  NS::B b;
-  auto &i = access_private::accessor<"m_i">(b);
-  ASSERT(i == 3);
+  NS::B::C c;
+  auto &i = access_private::accessor<"m_i">(c);
+  ASSERT(i == 4);
 }
 
 class C {
