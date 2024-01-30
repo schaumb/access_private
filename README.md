@@ -44,7 +44,7 @@ void bar() {
 ```
 
 You can call private member functions and static private functions, overloaded functions without macro.  
-You can also access static private variables, if they are defined out-of-class without macro.  
+You can also access static private variables without macro.  
 You can invoke private constructors and destructor.  
 You can invoke private member functions with they default arguments.  
 For DETAILED USAGE and EXAMPLES, please take a look [test.cpp](https://github.com/schaumb/access_private/blob/master/test/test.cpp) and [new_tests.cpp](https://github.com/schaumb/access_private/blob/master/test/new_tests.cpp)!
