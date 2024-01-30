@@ -31,21 +31,23 @@ int A::s_i = 404;
 // define the const static variable as well, otherwise we'll have linker error.
 const int A::s_ci;
 
-ACCESS_PRIVATE_FIELD(A, int, m_i)
+namespace access_private {
+  template struct access<&A::m_i>;
+}
 void test_access_private_in_lvalue_expr() {
   A a;
-  auto &i = access_private::m_i(a);
+  auto &i = access_private::accessor<"m_i">(a);
   ASSERT(i == 3);
   ++i;
   ASSERT(a.get_m_i() == 4);
 }
 void test_access_private_in_prvalue_expr() {
-  auto i = access_private::m_i(A{});
+  auto i = access_private::accessor<"m_i">(A{});
   ASSERT(i == 3);
 }
 void test_access_private_in_xvalue_expr() {
   A a;
-  auto i = access_private::m_i(std::move(a));
+  auto i = access_private::accessor<"m_i">(std::move(a));
   ASSERT(i == 3);
 }
 
@@ -60,27 +62,35 @@ public:
 };
 } // NS
 
-ACCESS_PRIVATE_FIELD(NS::B, int, m_i)
+namespace access_private {
+  template struct access<&NS::B::m_i>;
+  template struct access<&NS::B::C::m_i>;
+}
+
 void test_access_private_in_class_in_namespace() {
   NS::B b;
-  auto &i = access_private::m_i(b);
+  auto &i = access_private::accessor<"m_i">(b);
   ASSERT(i == 3);
 }
 
-ACCESS_PRIVATE_FIELD(NS::B::C, int, m_i)
+
 void test_access_private_in_nested_class() {
   NS::B b;
-  auto &i = access_private::m_i(b);
+  auto &i = access_private::accessor<"m_i">(b);
   ASSERT(i == 3);
 }
 
 class C {
   const int m_i = 3;
 };
-ACCESS_PRIVATE_FIELD(C, const int, m_i)
+
+namespace access_private {
+  template struct access<&C::m_i>;
+}
+
 void test_access_private_const_member() {
   C c;
-  auto &i = access_private::m_i(c);
+  auto &i = access_private::accessor<"m_i">(c);
   // should not deduce to int&
   static_assert(std::is_same<const int &, decltype(i)>::value, "");
   ASSERT(i == 3);
@@ -92,10 +102,14 @@ class CA {
 public:
   CA() {}
 };
-ACCESS_PRIVATE_FIELD(CA, int, m_i)
+
+namespace access_private {
+  template struct access<&CA::m_i>;
+}
+
 void test_access_private_const_object() {
   const CA ca;
-  auto &i = access_private::m_i(ca);
+  auto &i = access_private::accessor<"m_i">(ca);
   // should not deduce to int&
   static_assert(std::is_same<const int &, decltype(i)>::value, "");
   ASSERT(i == 3);
@@ -106,81 +120,98 @@ class TemplateA {
   T m_i = 3;
 };
 
-ACCESS_PRIVATE_FIELD(TemplateA<int>, int, m_i)
+
+namespace access_private {
+  template struct access<&TemplateA<int>::m_i>;
+}
+
 void test_access_private_template_field() {
   TemplateA<int> a;
-  auto &i = access_private::m_i(a);
+  auto &i = access_private::accessor<"m_i">(a);
   ASSERT(i == 3);
 }
 
 void test_access_private_constexpr() {
   constexpr A a;
-  static_assert(access_private::m_i(a) == 3, "");
+  static_assert(access_private::accessor<"m_i">(a) == 3, "");
 }
 
-ACCESS_PRIVATE_FUN(A, int(int), m_f)
+namespace access_private {
+  template struct access<&A::m_f>;
+}
+
 void test_call_private_in_lvalue_expr() {
   A a;
   int p = 3;
-  auto res = call_private::m_f(a, p);
+  auto res = access_private::accessor<"m_f">(a, std::move(p));
   ASSERT(res == 42);
 }
 void test_call_private_in_prvalue_expr() {
-  auto res = call_private::m_f(A{}, 3);
+  auto res = access_private::accessor<"m_f">(A{}, 3);
   ASSERT(res == 42);
 }
 void test_call_private_in_xvalue_expr() {
   A a;
-  auto res = call_private::m_f(std::move(a), 3);
+  auto res = access_private::accessor<"m_f">(std::move(a), 3);
   ASSERT(res == 42);
 }
 
 using const_a = const A;
-ACCESS_PRIVATE_FUN(const_a, int(int) const, m_cxf)
-void test_call_private_constexpr() {
-  constexpr A a;
-  static_assert(call_private::m_cxf(a, 5) == 15, "");
+
+namespace access_private {
+  template struct access<&A::m_cxf>;
 }
 
-// Uncomment to see error msg
-//class A2 {
-  //int m_f(int p) { return 14 * p; }
-//};
-//void test_call_private_different_types() {
-  //A2 a;
-  //int p = 3;
-  //auto res = call_private::m_f(a, p);
-//}
+void test_call_private_constexpr() {
+  constexpr A a;
+  static_assert(access_private::accessor<"m_cxf">(a, 5) == 15, "");
+}
 
-ACCESS_PRIVATE_STATIC_FIELD(A, int, s_i)
+namespace access_private {
+  template struct access<&A::s_i, A>;
+}
+
 void test_access_private_static() {
-  auto &i = access_private_static::A::s_i();
+  auto &i = access_private::accessor<"s_i">.static_ref<A>();
   ASSERT(i == 404);
   ++i;
   ASSERT(A::get_s_i() == 405);
 }
 
-ACCESS_PRIVATE_STATIC_FIELD(A, const int, s_ci)
+
+namespace access_private {
+  template struct access<&A::s_ci, A>;
+}
+
 void test_access_private_static_const() {
-  auto &i = access_private_static::A::s_ci();
+  auto &i = access_private::accessor<"s_ci">.static_ref<A>();
   static_assert(std::is_same<const int &, decltype(i)>::value, "");
   ASSERT(i == 403);
 }
 
-ACCESS_PRIVATE_STATIC_FIELD(A, const int, s_cxi)
-void test_access_private_static_constexpr() {
-  static_assert(access_private_static::A::s_cxi() == 42, "");
+namespace access_private {
+  template struct access<&A::s_cxi, A>;
 }
 
-ACCESS_PRIVATE_STATIC_FUN(A, int(int), s_f)
+void test_access_private_static_constexpr() {
+  static_assert(access_private::accessor<"s_cxi">.static_ref<A>() == 42, "");
+}
+
+namespace access_private {
+  template struct access<&A::s_f, A>;
+}
+
 void test_call_private_static() {
-  auto l = call_private_static::A::s_f(4);
+  auto l = access_private::accessor<"s_f">.call<A>(4);
   ASSERT(l == 5);
 }
 
-ACCESS_PRIVATE_STATIC_FUN(A, int(int), s_cxf)
+namespace access_private {
+  template struct access<&A::s_cxf, A>;
+}
+
 void test_call_private_static_constexpr() {
-  static_assert(call_private_static::A::s_cxf(5) == 10, "");
+  static_assert(access_private::accessor<"s_cxf">.call<A>(5) == 10, "");
 }
 
 class A3 {
@@ -204,54 +235,56 @@ class A3 {
   }
 };
 
-#if defined(__GNUC__)
-#define TEST_OVERLOADED_FUNCTIONS (__GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8))
-#elif defined(__clang__)
-#define TEST_OVERLOADED_FUNCTIONS (__clang_major__ >= 14)
-#else
-#define TEST_OVERLOADED_FUNCTIONS 1
-#endif
+#include "../include/overload.hpp"
 
-#if TEST_OVERLOADED_FUNCTIONS
+namespace access_private {
+  template struct access<overload<int>(&A3::m_f)>;
+  template struct access<overload<int, int>(&A3::m_f)>;
+}
 
-ACCESS_PRIVATE_FUN(A3, int(int), m_f)
-ACCESS_PRIVATE_FUN(A3, int(int, int), m_f)
 void test_call_private_overloaded() {
-  auto res = call_private::m_f(A3(), 1);
+  auto res = access_private::accessor<"m_f">(A3(), 1);
   ASSERT(res == 4);
-  res = call_private::m_f(A3(), 1, 2);
+  res = access_private::accessor<"m_f">(A3(), 1, 2);
   ASSERT(res == 7);
 }
 
 using const_a3 = const A3;
-ACCESS_PRIVATE_FUN(const_a3, int(int) const, m_cxf)
-ACCESS_PRIVATE_FUN(const_a3, const char*(const char*) const, m_cxf)
-void test_call_private_overloaded_constexpr() {
-  constexpr A3 a3;
-  static_assert(call_private::m_cxf(a3, 10) == 13, "");
-  constexpr const char data[] = "hello world";
-  static_assert(call_private::m_cxf(a3, data) == data+3, "");
+
+namespace access_private {
+  template struct access<&A3::m_cxf<int>>;
+  template struct access<&A3::m_cxf<const char*>>;
 }
 
-ACCESS_PRIVATE_STATIC_FUN(A3, int(char, int), s_f)
-ACCESS_PRIVATE_STATIC_FUN(A3, std::string(const char*, std::string), s_f)
+void test_call_private_overloaded_constexpr() {
+  constexpr A3 a3;
+  static_assert(access_private::accessor<"m_cxf">(a3, 10) == 13, "");
+  constexpr const char data[] = "hello world";
+  static_assert(access_private::accessor<"m_cxf">(a3, &*data) == data+3, "");
+}
+
+namespace access_private {
+  template struct access<&A3::s_f<char, int>, A3>;
+  template struct access<&A3::s_f<const char*, std::string>, A3>;
+}
+
 void test_call_private_overloaded_static() {
-  auto c = call_private_static::A3::s_f('A', 25);
+  auto c = access_private::accessor<"s_f">.call<A3>('A', 25);
   ASSERT(c == 'Z');
-  auto s = call_private_static::A3::s_f("Hello", "World");
+  auto s = access_private::accessor<"s_f">.call<A3>(&*"Hello", std::string{"World"});
   ASSERT(s == "HelloWorld");
 }
 
-/* FIXME: overloaded functions with the same amount of parameters are ambiguous
-ACCESS_PRIVATE_STATIC_FUN(A3, char(int), s_cxf)
-ACCESS_PRIVATE_STATIC_FUN(A3, const char*(float), s_cxf)
-void test_call_private_overloaded_static_constexpr() {
-  static_assert(call_private_static::A3::s_cxf(3) == '3', "");
-  static_assert(*call_private_static::A3::s_cxf(0.5) == '5', "");
+namespace access_private {
+  template struct access<overload<int>(&A3::s_cxf), A3>;
+  template struct access<overload<float>(&A3::s_cxf), A3>;
 }
-*/
 
-#endif  // TEST_OVERLOADED_FUNCTIONS
+void test_call_private_overloaded_static_constexpr() {
+  static_assert(access_private::accessor<"s_cxf">.call<A3>(3) == '3', "");
+  static_assert(*access_private::accessor<"s_cxf">.call<A3>(0.5f) == '5', "");
+}
+
 
 int main() {
   test_access_private_in_lvalue_expr();
@@ -272,12 +305,10 @@ int main() {
   test_access_private_static_constexpr();
   test_call_private_static();
   test_call_private_static_constexpr();
-#if TEST_OVERLOADED_FUNCTIONS
   test_call_private_overloaded();
   test_call_private_overloaded_constexpr();
   test_call_private_overloaded_static();
-  // test_call_private_overloaded_static_constexpr();
-#endif
+  test_call_private_overloaded_static_constexpr();
   printf("OK\n");
   return 0;
 }
