@@ -21,26 +21,31 @@ class A {
   int m_f(int p) { return 14 * p; }
 };
 
-ACCESS_PRIVATE_FIELD(A, int, m_i)
+namespace access_private {
+  template struct access<&A::m_i>;
+}
 
 void foo() {
   A a;
-  auto &i = access_private::m_i(a);
+  auto &i = access_private::accessor<"m_i">(a);
   assert(i == 3);
 }
 
-ACCESS_PRIVATE_FUN(A, int(int), m_f)
+namespace access_private {
+  template struct access<&A::m_f>;
+}
 
 void bar() {
   A a;
   int p = 3;
-  auto res = call_private::m_f(a, p);
+  auto res = access_private::accessor<"m_f">(a, std::move(p));
   assert(res == 42);
 }
 ```
+
 You can call private member functions and static private functions.
 You can also access static private variables, if they are defined out-of-class.
-For DETAILED USAGE and EXAMPLES, please take a look [test.cpp](https://github.com/martong/access_private/blob/master/test/test.cpp)!
+For DETAILED USAGE and EXAMPLES, please take a look [test.cpp](https://github.com/schaumb/access_private/blob/master/test/test.cpp) and [new_tests.cpp](https://github.com/schaumb/access_private/blob/master/test/new_tests.cpp)!
 
 # How does it work?
 The ISO C++ standard specifies that there is no access check in case of explicit
@@ -52,31 +57,23 @@ References:
 
 # Limitations
 
-* We cannot access private types. We cannot access private members of private nested types either.
-* We cannot call private constructors / destructors.
-* We cannot access the default arguments of the private functions.
-* We have a link time error in case of only in-class declared `const static` variables. That's because we'd take the address of that, and if that is not defined (i.e the compiler do a compile-time insert of the const value), we'd have an undefined symbol.
+* On MSVC, we cannot call private constructors / destructors.
+* On MSVC, we cannot access the default arguments of the private functions.
+* We have a link time error in case of only in-class declared `const static` variables if used as reference/pointer (or in debug build). That's because we'd take the address of that, and if that is not defined (i.e the compiler do a compile-time insert of the const value), we'd have an undefined symbol.
 
 # Compilers
 I have done tests for the following compilers:
-* Apple LLVM version 7.0.0 (clang-700.0.72)
+* LLVM version 16
 * GCC
-  * 5.1.0
-  * 4.8.4
-  * 4.7.4
+  * 13.2
+  * 12.3
 * MSVC
 
-Test code is compiled with -std=c++11 .
-
-It requires GCC >=4.8 or clang >=14 to access private overloaded functions.
-
-# Future
-I think it would be filling a gap if we could have out-of-class friend declarations in C++, though the committee might not agree with me.
-Nevertheless, this can be implemented fairly easy, see https://github.com/martong/clang/tree/out-of-class_friend_attr .
+Test code is compiled with -std=c++20 .
 
 # Notes
 There is a [C++ standard *issue*](https://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#2118) that says: 
 > Stateful metaprogramming via friend injection techniques should be ill-formed
 
-The `::private_access_detail::private_access<...>` template class implements a friend function `get()`, which is used after class definition.
+The `::access_private::accessor_t<...>` template class implements a friend function `get()`, which is used after class definition.
 I am not sure, however, if that issue has been ever fixed.
