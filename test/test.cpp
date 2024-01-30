@@ -156,8 +156,6 @@ void test_call_private_in_xvalue_expr() {
   ASSERT(res == 42);
 }
 
-using const_a = const A;
-
 namespace access_private {
   template struct access<&A::m_cxf>;
 }
