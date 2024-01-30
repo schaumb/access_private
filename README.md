@@ -1,6 +1,6 @@
 # Introduction
 
-This library is a collection of macros with which we can access private members.
+This library is a collection of template hacks with which we can access private members.
 Why would you need this?
 Testing.
 There are some cases when we want to test a class, but we can't or don't want to modify it.
@@ -43,9 +43,9 @@ void bar() {
 }
 ```
 
-You can call private member functions and static private functions.  
-You can also access static private variables, if they are defined out-of-class.  
-You can invoke private constructors and destructor too.  
+You can call private member functions and static private functions, overloaded functions without macro.  
+You can also access static private variables, if they are defined out-of-class without macro.  
+You can invoke private constructors and destructor.  
 You can invoke private member functions with they default arguments.  
 For DETAILED USAGE and EXAMPLES, please take a look [test.cpp](https://github.com/schaumb/access_private/blob/master/test/test.cpp) and [new_tests.cpp](https://github.com/schaumb/access_private/blob/master/test/new_tests.cpp)!
 
