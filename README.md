@@ -21,9 +21,7 @@ class A {
   int m_f(int p) { return 14 * p; }
 };
 
-namespace access_private {
-  template struct access<&A::m_i>;
-}
+template struct access_private::access<&A::m_i>;
 
 void foo() {
   A a;
@@ -31,9 +29,7 @@ void foo() {
   assert(i == 3);
 }
 
-namespace access_private {
-  template struct access<&A::m_f>;
-}
+template struct access_private::access<&A::m_f>;
 
 void bar() {
   A a;

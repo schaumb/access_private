@@ -31,9 +31,8 @@ int A::s_i = 404;
 // define the const static variable as well, otherwise we'll have linker error.
 const int A::s_ci;
 
-namespace access_private {
-  template struct access<&A::m_i>;
-}
+template struct access_private::access<&A::m_i>;
+
 void test_access_private_in_lvalue_expr() {
   A a;
   auto &i = access_private::accessor<"m_i">(a);
