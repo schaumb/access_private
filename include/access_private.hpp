@@ -535,6 +535,13 @@ namespace access_private {
                                     > {
   };
 
+  template<auto T> requires(!std::same_as<decltype(T), decltype(+T)> &&
+             std::is_pointer_v<typename decltype(freeptr{+T})::res_type>)
+  struct access<T, void> : access_impl<T, void, decltype(memptr{+T}),
+                                   type_name<std::remove_pointer_t<typename decltype(freeptr{+T})::res_type>>()
+                                    > {
+  };
+
   template<auto T, static_string S, class V = void>
   struct unique_access;
 
@@ -610,6 +617,8 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
     return T::member(ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__));  \
 }, #member, T>
 
+#define private_base(Derived, Base) [](Derived* p) -> Base* { return p; }
+
 #elif not defined(_MSC_VER)
   template<class T, class ...Ts>
   constexpr inline static auto constructor_ = [] (Ts&&...ts) -> T { return T{std::forward<Ts>(ts)...}; };
@@ -620,6 +629,12 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 
   template<class F, static_string S, class Args, class T, class ...Ts>
   constexpr inline static auto call_member_ = []{};
+
+  template<class Derived, class Base>
+  constexpr inline static auto cast_base_ = [] (Derived* p) -> Base* {
+    static_assert(!std::is_same_v<Derived, Derived>, "Private base class access is not supported in gcc. See at http://tinyurl.com/gccprivatebaseclass");
+    return p;
+  };
 
 #define constructor(T, ...) ::access_private::constructor_<T __VA_OPT__(,) __VA_ARGS__>
 #define constructing_at(T, ...) ::access_private::construct_at_<T __VA_OPT__(,) __VA_ARGS__>
@@ -639,12 +654,15 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
     };                                            \
     template struct unique_access<call_member_<T, #member, std::tuple<__VA_ARGS__>, T __VA_OPT__(,) __VA_ARGS__>, #member, T>\
 
+#define private_base(Derived, Base) ::access_private::cast_base_<Derived, Base>
+
 #else
 #define constructor(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define constructing_at(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define destructing_at(T) [] { static_assert(false, "Private destructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define call_member_function_with(T, member, ...) [] { static_assert(false, "Unique member function access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define call_static_function_with(T, member, ...) [] { static_assert(false, "Unique static function access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
+#define private_base(Derived, Base) [] { static_assert(false, "Private base class access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #endif
 
 }

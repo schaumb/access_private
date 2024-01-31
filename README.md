@@ -43,10 +43,12 @@ void bar() {
 }
 ```
 
-You can call private member functions and static private functions, overloaded functions without macro.  
-You can also access static private variables without macro.  
-You can invoke private constructors and destructor.  
-You can invoke private member functions with they default arguments.  
+- You can call private member functions and static private functions, overloaded functions without macro.
+- You can also access static private variables without macro.
+- You can invoke private constructors and destructor.
+- You can invoke private member functions with they default arguments.
+- You can get the private base class address of a derived class address.
+
 For DETAILED USAGE and EXAMPLES, please take a look [test.cpp](https://github.com/schaumb/access_private/blob/master/test/test.cpp) and [new_tests.cpp](https://github.com/schaumb/access_private/blob/master/test/new_tests.cpp)!
 
 # How does it work?
@@ -60,7 +62,8 @@ References:
 # Limitations
 
 * We cannot access private members that are references. (See this [issue](https://github.com/martong/access_private/issues/12).)
-* On MSVC, we cannot call private constructors / destructors, and we cannot access the default arguments of the private functions. (See this [issue](http://tinyurl.com/msvcconstructor).)
+* On MSVC, we cannot call private constructors / destructors, we cannot access the default arguments of the private functions, and we cannot get the private base class address. (See this [issue](http://tinyurl.com/msvcconstructor).)
+* On GCC, we cannot get the private base class address. (See this [issue](http://tinyurl.com/gccprivatebaseclass).)
 * We have a link time error in case of only in-class declared `const static` variables if used as reference/pointer (or in debug build). That's because we'd take the address of that, and if that is not defined (i.e the compiler do a compile-time insert of the const value), we'd have an undefined symbol.
 
 # Compilers

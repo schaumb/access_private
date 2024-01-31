@@ -22,7 +22,7 @@ class A {
   X d;
 };
 
-class B {
+class B : A {
   B() = default;
   B(int, double) {}
 
@@ -122,6 +122,10 @@ namespace access_private {
   call_static_function_with(B, def2, int);
   call_static_function_with(B, def2, int, float);
 #endif
+
+#if defined(__clang__)
+  template struct access<private_base(B, A)>;
+#endif
 }
 int main() {
   using namespace access_private;
@@ -210,6 +214,11 @@ int main() {
   accessor<"def2">.call<B>();
   accessor<"def2">.call<B>(1);
   accessor<"def2">.call<B>(1, 2.2f);
+#endif
+
+
+#if defined(__clang__)
+  A* base = accessor<"A">(&X);
 #endif
 
 }
