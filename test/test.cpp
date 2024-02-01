@@ -15,6 +15,7 @@
 class A {
   int m_i = 3;
   int m_f(int p) { return 14 * p; }
+  int m_f2(int&& p) { return 14 * p; }
   constexpr int m_cxf(int p) const { return p * m_i; }
   static int s_i;
   static const int s_ci = 403;
@@ -156,6 +157,16 @@ void test_call_private_in_xvalue_expr() {
 }
 
 namespace access_private {
+  template struct access<&A::m_f2>;
+}
+
+void test_call_private_xvalue_parameter_through_explicit_parameters() {
+  A a;
+  auto res = access_private::accessor<"m_f2", A&, int&&>(a, 3);
+  ASSERT(res == 42);
+}
+
+namespace access_private {
   template struct access<&A::m_cxf>;
 }
 
@@ -195,7 +206,13 @@ void test_access_private_static_constexpr() {
 }
 
 namespace access_private {
-  template struct access<&A::s_f, A>;
+// older GCC will not work the "expected" static function call
+// for this reason we need to use the call_static_function_with
+#if not defined(__clang__) and defined (__GNUC__)
+  call_static_function_with(A, s_f, int);
+#else
+  template struct access_private::access<&A::s_f, A>;
+#endif
 }
 
 void test_call_private_static() {
@@ -204,7 +221,13 @@ void test_call_private_static() {
 }
 
 namespace access_private {
+// older GCC will not work the "expected" static function call
+// for this reason we need to use the call_static_function_with
+#if not defined(__clang__) and defined (__GNUC__)
+  call_static_function_with(A, s_cxf, int);
+#else
   template struct access<&A::s_cxf, A>;
+#endif
 }
 
 void test_call_private_static_constexpr() {
@@ -261,8 +284,15 @@ void test_call_private_overloaded_constexpr() {
 }
 
 namespace access_private {
+// older GCC will not work the "expected" static function call
+// for this reason we need to use the call_static_function_with
+#if not defined(__clang__) and defined (__GNUC__)
+  call_static_function_with(A3, s_f, char, int);
+  call_static_function_with(A3, s_f, const char*, std::string);
+#else
   template struct access<&A3::s_f<char, int>, A3>;
   template struct access<&A3::s_f<const char*, std::string>, A3>;
+#endif
 }
 
 void test_call_private_overloaded_static() {
@@ -273,8 +303,15 @@ void test_call_private_overloaded_static() {
 }
 
 namespace access_private {
+// older GCC will not work the "expected" static function call
+// for this reason we need to use the call_static_function_with
+#if not defined(__clang__) and defined (__GNUC__)
+  call_static_function_with(A3, s_cxf, int);
+  call_static_function_with(A3, s_cxf, float);
+#else
   template struct access<overload<int>(&A3::s_cxf), A3>;
   template struct access<overload<float>(&A3::s_cxf), A3>;
+#endif
 }
 
 void test_call_private_overloaded_static_constexpr() {
@@ -296,6 +333,7 @@ int main() {
   test_call_private_in_prvalue_expr();
   test_call_private_in_xvalue_expr();
   test_call_private_in_lvalue_expr();
+  test_call_private_xvalue_parameter_through_explicit_parameters();
   test_call_private_constexpr();
   test_access_private_static();
   test_access_private_static_const();

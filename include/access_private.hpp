@@ -256,7 +256,18 @@ namespace access_private {
   struct accessor_t<S, A, Args...> : accessor_t<S> {
     friend constexpr auto get(accessor_t<S, A, Args...>);
 
-    friend constexpr decltype(auto) get(accessor_t<S>, A, Args &&...);
+    friend constexpr decltype(auto) get(accessor_t<S>, A, Args ...);
+
+    template<class First, class ...Ts>
+    constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const {
+      return (get(accessor_t<S, A, Args...>{}, std::forward<First>(f), std::forward<Ts>(ts)...));
+    }
+
+    template<class Base, class ...Ts>
+    constexpr decltype(auto) call(Ts &&... ts) const {
+      return (get(accessor_t<S, std::type_identity<Base> *, Ts...>{},
+                  static_cast<std::type_identity<Base> *>(nullptr), std::forward<Ts>(ts)...));
+    }
   };
 
 #if not defined(__clang__) and defined(__GNUC__)
@@ -281,7 +292,7 @@ namespace access_private {
       return T.ptr;
     }
 
-    friend constexpr decltype(auto) get(super_base, Class this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, Class this_, Args... args) {
       return (std::invoke(T.ptr, std::forward<Class>(this_), std::forward<Args>(args)...));
     }
   };
@@ -304,15 +315,15 @@ namespace access_private {
 
     friend constexpr auto get(base_3) { return memptr{+T}.ptr; }
 
-    friend constexpr decltype(auto) get(super_base, Class this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, Class this_, Args... args) {
       return (std::invoke(memptr{+T}.ptr, this_, std::forward<Args>(args)...));
     }
 
-    friend constexpr decltype(auto) get(super_base, rptr &this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, rptr &this_, Args... args) {
       return (std::invoke(memptr{+T}.ptr, &this_, std::forward<Args>(args)...));
     }
 
-    friend constexpr decltype(auto) get(super_base, rptr &&this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, rptr &&this_, Args... args) {
       return (std::invoke(memptr{+T}.ptr, &this_, std::forward<Args>(args)...));
     }
   };
@@ -421,7 +432,7 @@ namespace access_private {
       return freeptr{+T}.ptr;
     }
 
-    friend constexpr decltype(auto) get(super_base, std::type_identity<Base> *this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, std::type_identity<Base> *this_, Args... args) {
       if constexpr (std::is_function_v<std::remove_pointer_t<Ptr>>) {
         return (std::invoke(freeptr{+T}.ptr, std::forward<Args>(args)...));
       } else {
@@ -441,7 +452,7 @@ namespace access_private {
       return freeptr{+T}.ptr;
     }
 
-    friend constexpr decltype(auto) get(super_base, std::type_identity<Base> *this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, std::type_identity<Base> *this_, Args... args) {
       return (std::invoke(freeptr{+T}.ptr, std::forward_as_tuple(std::forward<Args>(args)...)));
     }
   };
@@ -465,15 +476,15 @@ namespace access_private {
 
     friend constexpr auto get(base_3) { return memptr{+T}.ptr; }
 
-    friend constexpr decltype(auto) get(super_base, Class this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, Class this_, Args... args) {
       return (std::invoke(memptr{+T}.ptr, this_, std::forward_as_tuple(std::forward<Args>(args)...)));
     }
 
-    friend constexpr decltype(auto) get(super_base, rptr &this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, rptr &this_, Args... args) {
       return (std::invoke(memptr{+T}.ptr, &this_, std::forward_as_tuple(std::forward<Args>(args)...)));
     }
 
-    friend constexpr decltype(auto) get(super_base, rptr &&this_, Args &&... args) {
+    friend constexpr decltype(auto) get(super_base, rptr &&this_, Args... args) {
       return (std::invoke(memptr{+T}.ptr, &this_, std::forward_as_tuple(std::forward<Args>(args)...)));
     }
   };
@@ -490,7 +501,7 @@ namespace access_private {
     }
 
     friend constexpr decltype(auto)
-    get(super_base, std::type_identity<Base> *this_, std::remove_reference_t<Res> *&&pure_this, Args &&... args) {
+    get(super_base, std::type_identity<Base> *this_, std::remove_reference_t<Res> *pure_this, Args... args) {
       return (std::invoke(freeptr{+T}.ptr, pure_this, std::forward_as_tuple(std::forward<Args>(args)...)));
     }
   };
@@ -564,8 +575,8 @@ namespace access_private {
                                               > {
   };
 
-  template<static_string S>
-  constexpr static accessor_t<S> accessor{};
+  template<static_string S, class ...Args>
+  constexpr static accessor_t<S, Args...> accessor{};
 
   template<class Base, class T>
   struct type_access
@@ -581,16 +592,16 @@ namespace access_private {
 
 #if defined(__clang__)
 #define ACCESS_PRIVATE_GET_TUPLE_ARGE(...)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG0(x) std::get<0>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG1(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG0(__VA_ARGS__), std::get<1>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG2(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG1(__VA_ARGS__), std::get<2>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG3(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG2(__VA_ARGS__), std::get<3>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG4(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG3(__VA_ARGS__), std::get<4>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG5(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG4(__VA_ARGS__), std::get<5>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG6(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG5(__VA_ARGS__), std::get<6>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG7(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG6(__VA_ARGS__), std::get<7>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG8(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG7(__VA_ARGS__), std::get<8>(t)
-#define ACCESS_PRIVATE_GET_TUPLE_ARG9(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG8(__VA_ARGS__), std::get<9>(t)
+#define ACCESS_PRIVATE_GET_TUPLE_ARG0(x) std::forward<std::tuple_element_t<0, std::remove_reference_t<decltype(t)>>>(std::get<0>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG1(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG0(__VA_ARGS__), std::forward<std::tuple_element_t<1, std::remove_reference_t<decltype(t)>>>(std::get<1>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG2(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG1(__VA_ARGS__), std::forward<std::tuple_element_t<2, std::remove_reference_t<decltype(t)>>>(std::get<2>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG3(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG2(__VA_ARGS__), std::forward<std::tuple_element_t<3, std::remove_reference_t<decltype(t)>>>(std::get<3>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG4(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG3(__VA_ARGS__), std::forward<std::tuple_element_t<4, std::remove_reference_t<decltype(t)>>>(std::get<4>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG5(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG4(__VA_ARGS__), std::forward<std::tuple_element_t<5, std::remove_reference_t<decltype(t)>>>(std::get<5>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG6(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG5(__VA_ARGS__), std::forward<std::tuple_element_t<6, std::remove_reference_t<decltype(t)>>>(std::get<6>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG7(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG6(__VA_ARGS__), std::forward<std::tuple_element_t<7, std::remove_reference_t<decltype(t)>>>(std::get<7>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG8(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG7(__VA_ARGS__), std::forward<std::tuple_element_t<8, std::remove_reference_t<decltype(t)>>>(std::get<8>(t))
+#define ACCESS_PRIVATE_GET_TUPLE_ARG9(x, ...) ACCESS_PRIVATE_GET_TUPLE_ARG8(__VA_ARGS__), std::forward<std::tuple_element_t<9, std::remove_reference_t<decltype(t)>>>(std::get<9>(t))
 
 #define ACCESS_PRIVATE_GET_TUPLE_ARG(i, ...) ACCESS_PRIVATE_GET_TUPLE_ARGX(i, __VA_ARGS__)
 #define ACCESS_PRIVATE_GET_TUPLE_ARGX(i, ...) ACCESS_PRIVATE_GET_TUPLE_ARG##i(__VA_ARGS__)
@@ -621,9 +632,9 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 
 #elif not defined(_MSC_VER)
   template<class T, class ...Ts>
-  constexpr inline static auto constructor_ = [] (Ts&&...ts) -> T { return T{std::forward<Ts>(ts)...}; };
+  constexpr inline static auto constructor_ = [] (Ts...ts) -> T { return T{std::forward<Ts>(ts)...}; };
   template<class T, class ...Ts>
-  constexpr inline static auto construct_at_ = [] (T* p, Ts&&...ts) -> T& { return *new (p) T{std::forward<Ts>(ts)...}; };
+  constexpr inline static auto construct_at_ = [] (T* p, Ts...ts) -> T& { return *new (p) T{std::forward<Ts>(ts)...}; };
   template<class T>
   constexpr inline static auto destruct_at_ = [] (T& p) { p.~T(); };
 
@@ -642,14 +653,14 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 
 #define call_member_function_with(T, member, ...) \
     template<class X, class ...Ts> \
-    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (X* p, Ts&&...ts) -> decltype(auto) { \
+    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (X* p, Ts...ts) -> decltype(auto) { \
         return p->member(std::forward<Ts>(ts)...); \
     };                                            \
     template struct unique_access<call_member_<T, #member, std::tuple<__VA_ARGS__>, T __VA_OPT__(,) __VA_ARGS__>, #member>
                                                   \
 #define call_static_function_with(T, member, ...) \
     template<class X, class ...Ts> \
-    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (Ts&&...ts) -> decltype(auto) { \
+    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (Ts...ts) -> decltype(auto) { \
         return X::member(std::forward<Ts>(ts)...); \
     };                                            \
     template struct unique_access<call_member_<T, #member, std::tuple<__VA_ARGS__>, T __VA_OPT__(,) __VA_ARGS__>, #member, T>\

@@ -91,6 +91,13 @@ namespace access_private {
   // overloaded static member function
   template struct access<overload<double>(&B::y), B>;
   template struct access<overload<int, float>(&B::y), B>;
+#else
+  // static member function
+  call_static_function_with(B, cica);
+
+  // overloaded static member function
+  call_static_function_with(B, y, double);
+  call_static_function_with(B, y, int, float);
 #endif
 
   // static member variables
@@ -174,13 +181,11 @@ int main() {
   static_assert(&p == pp);
   p();
 
-#if HAS_STATIC_MEMBER_FUNCTION
   accessor<"cica">.call<B>();
 
   constexpr void (*sp)(double) = accessor<"y">.static_ptr<B, double>();
 
   accessor<"y">.call<B>(0.1);
-#endif
 
 #if not defined(_MSC_VER)
   B X {accessor<"construct">.call<B>()};
