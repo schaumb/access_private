@@ -44,6 +44,7 @@ void bar() {
 - You can invoke private constructors and the destructor.
 - You can invoke private member functions with the default arguments.
 - You can get private derived class addresses.
+- You can get lambda's captured variables.
 
 For DETAILED USAGE and EXAMPLES, please take a look at [test.cpp](https://github.com/schaumb/access_private/blob/master/test/test.cpp) and [new_tests.cpp](https://github.com/schaumb/access_private/blob/master/test/new_tests.cpp)!
 
@@ -60,6 +61,7 @@ References:
 * We cannot access private reference members. (See this [issue](https://github.com/martong/access_private/issues/12).) On clang [this](http://tinyurl.com/clangexplicittemplate) could be solved.
 * On MSVC, we cannot call private constructors/destructors, we cannot access the default arguments of the private functions, and we cannot get the private base class address. (See [issue 1](http://tinyurl.com/msvcconstructor) [issue 2](http://tinyurl.com/msvcbaseclass).)
 * On GCC, we cannot get the private base class address. (See this [issue](http://tinyurl.com/gccprivatebaseclass).)
+* On Clang, we cannot get lambda's captured variables, because of the implementation: the captured variables are unnamed implicit members.
 * We have a link-time error in case of only in-class declared `const static` variables if used as reference/pointer (or in debug build). That's because we'd take the address of that, and if that is not defined (i.e. the compiler does a compile-time insert of the const value), we'd have an undefined symbol. This can be workarounded with macro.
 
 # Compilers

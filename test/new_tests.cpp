@@ -46,6 +46,13 @@ class C {
   ~C() { printf("~C()\n"); }
 };
 
+auto lambda_getter(int a) {
+  return [a] () -> int { return a; };
+}
+
+auto lambda = lambda_getter(5);
+using Lambda = decltype(lambda);
+
 namespace access_private {
   // access member variable
   template struct access<&A::a>;
@@ -132,6 +139,8 @@ namespace access_private {
 
 #if defined(__clang__)
   template struct access<private_base(B, A)>;
+#else
+  lambda_member_accessor(Lambda, a);
 #endif
 }
 int main() {
@@ -224,6 +233,8 @@ int main() {
 
 #if defined(__clang__)
   A* base = accessor<"A">(&X);
+#else
+  int& l = accessor<"a">(lambda);
 #endif
 
 }

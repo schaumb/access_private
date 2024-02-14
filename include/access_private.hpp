@@ -555,6 +555,12 @@ namespace access_private {
 
   template<auto T, static_string S, class V = void>
   struct unique_access;
+  template<auto T, static_string S>
+    requires(std::is_member_object_pointer_v<decltype(T)>)
+  struct unique_access<T, S, void> : access_impl<memptr{T}, void,
+                                                 decltype(memptr{T}), S
+                                                 > {
+  };
 
   template<auto T, static_string S>
     requires(!std::same_as<decltype(T), decltype(+T)>)
@@ -630,6 +636,9 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 
 #define private_base(Derived, Base) [](Derived* p) -> Base* { return p; }
 
+#define lambda_member_accessor(LType, Member) \
+   [] { static_assert(false, "Lambda member access is not supported in clang"); }
+
 #elif not defined(_MSC_VER)
   template<class T, class ...Ts>
   constexpr inline static auto constructor_ = [] (Ts...ts) -> T { return T{std::forward<Ts>(ts)...}; };
@@ -667,6 +676,9 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 
 #define private_base(Derived, Base) ::access_private::cast_base_<Derived, Base>
 
+#define lambda_member_accessor(LType, Member) \
+   template struct unique_access<&LType::__ ## Member, #Member>
+
 #else
 #define constructor(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define constructing_at(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
@@ -674,6 +686,10 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 #define call_member_function_with(T, member, ...) [] { static_assert(false, "Unique member function access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define call_static_function_with(T, member, ...) [] { static_assert(false, "Unique static function access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
 #define private_base(Derived, Base) [] { static_assert(false, "Private base class access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
+
+#define lambda_member_accessor(LType, Member) \
+    template struct access<&LType::Member>
+
 #endif
 
 }
