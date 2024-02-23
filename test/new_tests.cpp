@@ -7,11 +7,12 @@ class A {
   auto x(int, float) { return 4; }
 
   void y(double) { }
-  auto y(int, float) const { return 45; }
+  [[nodiscard]] auto y(int, float) const { return 45; }
 
   int z(int) { return 2;}
   double z(int) const { return 0.1;}
   void z(int) const volatile {}
+  void z(int) volatile noexcept {}
 
   void def(int, float = 0.0f) {}
   void def2(int = 0, float = 0.0f) {}
@@ -47,11 +48,10 @@ class C {
 };
 
 auto lambda_getter(int a) {
-  return [a] () -> int { return a; };
+  return [a, b=10] () -> int { return a; };
 }
 
 auto lambda = lambda_getter(5);
-using Lambda = decltype(lambda);
 
 namespace access_private {
   // access member variable
@@ -68,10 +68,10 @@ namespace access_private {
   // access overloaded with specifier:
   template struct access<overload<int>(&A::z)>;
   template struct access<const_overload<int>(&A::z)>;
-  // same as:
-  // template struct access<man_overload<acc::const_, int>(&A::z)>;
+  // same as: template struct access<man_overload<acc::const_, int>(&A::z)>;
+
   template struct access<man_overload<acc::volatile_, int>(&A::z)>;
-  // or acc::const_volatile
+  template struct access<man_overload<acc::volatile_ + acc::const_, int>(&A::z)>;
 
   // other class with same name
   template struct access<&B::z>;
@@ -140,7 +140,8 @@ namespace access_private {
 #if defined(__clang__)
   template struct access<private_base(B, A)>;
 #else
-  lambda_member_accessor(Lambda, a);
+  lambda_member_accessor(decltype(lambda), a);
+  lambda_member_accessor(decltype(lambda), b);
 #endif
 }
 int main() {
@@ -177,6 +178,8 @@ int main() {
   auto c3 = accessor<"z">(std::move(a), 1);
   auto c4 = accessor<"z">(std::as_const(a), 1);
 
+  static_assert(noexcept(accessor<"z">(std::add_pointer_t<volatile A>{nullptr}, 0)));
+  static_assert(!noexcept(accessor<"z">(std::add_pointer_t<const volatile A>{nullptr}, 0)));
 
   float (B::*bx)(int) const = accessor<"z">.ptr<const B&, int>();
 
@@ -184,21 +187,21 @@ int main() {
 
   XT copy_d = accessor<"d">(a);
 
-  constexpr auto& p = accessor<"LAMBDA">.static_ref<B>();
+  constexpr auto& p = accessor<"LAMBDA">.on_type<B>();
   constexpr auto* pp = accessor<"LAMBDA">.static_ptr<B>();
-  // auto p2 = accessor<"maca">.static_ref<B>(); // only copy is possible
+  // auto p2 = accessor<"maca">.on_type<B>(); // only copy is possible
   static_assert(&p == pp);
   p();
 
-  accessor<"cica">.call<B>();
+  accessor<"cica">.on_type<B>();
 
   constexpr void (*sp)(double) = accessor<"y">.static_ptr<B, double>();
 
-  accessor<"y">.call<B>(0.1);
+  accessor<"y">.on_type<B>(0.1);
 
 #if not defined(_MSC_VER)
-  B X {accessor<"construct">.call<B>()};
-  B X2 = accessor<"construct">.call<B>(1, 2.2);
+  B X {accessor<"construct">.on_type<B>()};
+  B X2 = accessor<"construct">.on_type<B>(1, 2.2);
 
   union U {
     char arr;
@@ -210,31 +213,32 @@ int main() {
   U u;
   U oth;
 
-  C& c = accessor<"C">.call<C>(&u.c);
-  C& othC = accessor<"C">.call<C>(&oth.c, std::as_const(c));
+  C& c = accessor<"C">.on_type<C>(&u.c);
+  C& othC = accessor<"C">.on_type<C>(&oth.c, std::as_const(c));
 
   auto constr = accessor<"construct">.static_ptr<C, const C&>();
   // C &&anoth {constr(std::as_const(c))}; // this will not work, because ~C is private
 
-  accessor<"~C">.call<C>(othC);
-  accessor<"~C">.call<C>(c);
+  accessor<"~C">.on_type<C>(othC);
+  accessor<"~C">.on_type<C>(c);
 
   accessor<"def">(a, 4u); // calls a.def(4) with second default argument
   accessor<"def2">(a);
   accessor<"def2">(a, 1);
   accessor<"def2">(a, 1, 2.2f);
 
-  accessor<"def">.call<B>(4l);
-  accessor<"def2">.call<B>();
-  accessor<"def2">.call<B>(1);
-  accessor<"def2">.call<B>(1, 2.2f);
+  accessor<"def">.on_type<B>(4l);
+  accessor<"def2">.on_type<B>();
+  accessor<"def2">.on_type<B>(1);
+  accessor<"def2">.on_type<B>(1, 2.2f);
 #endif
 
 
 #if defined(__clang__)
   A* base = accessor<"A">(&X);
 #else
-  int& l = accessor<"a">(lambda);
+  int& ac = accessor<"a">(lambda);
+  int& bc = accessor<"b">(lambda);
 #endif
 
 }

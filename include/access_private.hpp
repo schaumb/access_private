@@ -6,9 +6,10 @@
 #include <functional>
 
 namespace access_private {
-  template<class Ptr, class Res, class ...Args>
+  template<class Ptr, class Res, bool Noexcept = true, bool Vararg = false, class ...Args>
   struct freeptr {
     using res_type = Res;
+    constexpr static bool is_noexcept = Noexcept;
     constinit static const auto args = sizeof...(Args);
 
     constexpr freeptr(Ptr ptr) : ptr{ptr} {}
@@ -18,8 +19,9 @@ namespace access_private {
     Ptr ptr;
   };
 
-  template<class Ptr, class Res, class Class, class ...Args>
+  template<class Ptr, class Res, class Class, bool Noexcept = true, bool Vararg = false, class ...Args>
   struct memptr {
+    constexpr static bool is_noexcept = Noexcept;
     constexpr memptr(Ptr ptr) : ptr{ptr} {}
 
     constexpr memptr operator+() const { return *this; }
@@ -28,53 +30,51 @@ namespace access_private {
   };
 
   template<class Res, class ...Args>
-  freeptr(Res (*)(Args...)) -> freeptr<Res(*)(Args...), Res, Args...>;
+  freeptr(Res (*)(Args...)) -> freeptr<Res(*)(Args...), Res, false, false, Args...>;
+  template<class Res, class ...Args>
+  freeptr(Res (*)(Args...) noexcept) -> freeptr<Res(*)(Args...), Res, true, false, Args...>;
+  template<class Res, class ...Args>
+  freeptr(Res (*)(Args..., ...)) -> freeptr<Res(*)(Args...), Res, false, true, Args...>;
+  template<class Res, class ...Args>
+  freeptr(Res (*)(Args..., ...) noexcept) -> freeptr<Res(*)(Args...), Res, true, true, Args...>;
 
   template<class Res>
   freeptr(Res *) -> freeptr<Res *, Res>;
 
   template<class Res, class M, class ...Ts>
-  memptr(Res (* t)(M*, Ts...)) -> memptr<decltype(t), Res, M *, Ts...>;
+  memptr(Res (* t)(M*, Ts...)) -> memptr<decltype(t), Res, M *, false, false, Ts...>;
+  template<class Res, class M, class ...Ts>
+  memptr(Res (* t)(M*, Ts...) noexcept) -> memptr<decltype(t), Res, M *, true, false, Ts...>;
+  template<class Res, class M, class ...Ts>
+  memptr(Res (* t)(M*, Ts..., ...)) -> memptr<decltype(t), Res, M *, false, true, Ts...>;
+  template<class Res, class M, class ...Ts>
+  memptr(Res (* t)(M*, Ts..., ...) noexcept) -> memptr<decltype(t), Res, M *, true, true, Ts...>;
 
   template<class Res, class M>
   memptr(Res M::* t) -> memptr<decltype(t), Res, M>;
 
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...)) -> memptr<decltype(t), Res, M *, Ts...>;
+#define MEM_PTR_GETTER_NOE_VAR(CV_, REF_, REF_P_) \
+  template<class Res, class M, class ...Ts> \
+  memptr(Res (M::* t)(Ts...     ) CV_ REF_         ) -> memptr<decltype(t), Res, CV_ M REF_P_, false, false, Ts...>; \
+  template<class Res, class M, class ...Ts> \
+  memptr(Res (M::* t)(Ts...     ) CV_ REF_ noexcept) -> memptr<decltype(t), Res, CV_ M REF_P_, true , false, Ts...>; \
+  template<class Res, class M, class ...Ts> \
+  memptr(Res (M::* t)(Ts..., ...) CV_ REF_         ) -> memptr<decltype(t), Res, CV_ M REF_P_, false, true , Ts...>; \
+  template<class Res, class M, class ...Ts> \
+  memptr(Res (M::* t)(Ts..., ...) CV_ REF_ noexcept) -> memptr<decltype(t), Res, CV_ M REF_P_, true , true , Ts...>;
 
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) const) -> memptr<decltype(t), Res, const M *, Ts...>;
+#define MEM_PTR_GETTER_CV(REF_, REF_P_) \
+  MEM_PTR_GETTER_NOE_VAR(		       , REF_, REF_P_) \
+  MEM_PTR_GETTER_NOE_VAR(const		   , REF_, REF_P_) \
+  MEM_PTR_GETTER_NOE_VAR(volatile	   , REF_, REF_P_) \
+  MEM_PTR_GETTER_NOE_VAR(const volatile, REF_, REF_P_)
 
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) volatile) -> memptr<decltype(t), Res, volatile M *, Ts...>;
+MEM_PTR_GETTER_CV(  , *)
+MEM_PTR_GETTER_CV( &, &)
+MEM_PTR_GETTER_CV(&&,&&)
 
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) const volatile) -> memptr<decltype(t), Res, const volatile M *, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) &) -> memptr<decltype(t), Res, M &, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) const &) -> memptr<decltype(t), Res, const M &, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) volatile &) -> memptr<decltype(t), Res, volatile M &, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) const volatile &) -> memptr<decltype(t), Res, const volatile M &, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) &&) -> memptr<decltype(t), Res, M &&, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) const &&) -> memptr<decltype(t), Res, const M &&, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) volatile &&) -> memptr<decltype(t), Res, volatile M &&, Ts...>;
-
-  template<class Res, class M, class ...Ts>
-  memptr(Res (M::* t)(Ts...) const volatile &&) -> memptr<decltype(t), Res, const volatile M &&, Ts...>;
-
+#undef MEM_PTR_GETTER_CV
+#undef MEM_PTR_GETTER_NOE_VAR
 
 #ifdef _MSC_VER
   template <class T> struct wrap {
@@ -114,9 +114,23 @@ namespace access_private {
               }
             }
             break;
+          case '>':
+            for (std::size_t brackets = 1;
+                 brackets > 0;) {
+              switch (sv[--ix]) {
+              case '>':
+                ++brackets; break;
+              case '<':
+                if (--brackets == 0)
+                  --ix;
+                break;
+              }
+            }
           case 't':
             if (sv.substr(0, ix).ends_with(" cons"))
               ix-=5;
+            else if (sv.substr(0, ix).ends_with(" noexcep"))
+              ix-=8;
             else
               return ix;
             break;
@@ -187,7 +201,7 @@ namespace access_private {
         *p++ = ch;
     }
 
-    char arr[N];
+    char arr[N]{};
   };
 
   template<std::size_t N>
@@ -198,9 +212,12 @@ namespace access_private {
 
   template<static_string S>
   struct accessor_t<S> {
-
     template<class First, class ...Ts>
     constexpr auto operator()(First &&f, Ts &&... ts) const
+      noexcept(memptr{accessor_t<S>{}.ptr<std::conditional_t<
+                                      std::is_pointer_v<First>,
+                                      First,
+                                      First &&>, Ts...>()}.is_noexcept)
         -> decltype((get(accessor_t<S,
                                     std::conditional_t<
                                         std::is_pointer_v<First>,
@@ -214,20 +231,12 @@ namespace access_private {
     }
 
     template<class Base, class ...Ts>
-    constexpr auto call(Ts &&... ts) const
-
+    constexpr auto on_type(Ts &&... ts) const
+      noexcept(freeptr{accessor_t<S>{}.static_ptr<Base, Ts...>()}.is_noexcept)
         -> decltype((get(accessor_t<S, std::type_identity<Base> *, Ts...>{},
                          static_cast<std::type_identity<Base> *>(nullptr), std::forward<Ts>(ts)...))) {
       return (get(accessor_t<S, std::type_identity<Base> *, Ts...>{},
                   static_cast<std::type_identity<Base> *>(nullptr), std::forward<Ts>(ts)...));
-    }
-
-    template<class Base>
-    constexpr auto static_ref() const
-        -> decltype((get(accessor_t<S, std::type_identity<Base> *>{},
-                         static_cast<std::type_identity<Base> *>(nullptr)))) {
-      return (get(accessor_t<S, std::type_identity<Base> *>{},
-                  static_cast<std::type_identity<Base> *>(nullptr)));
     }
 
     template<class T> requires(requires{ get(accessor_t<S, T *>{}, static_cast<T *>(nullptr)); })
@@ -259,12 +268,16 @@ namespace access_private {
     friend constexpr decltype(auto) get(accessor_t<S>, A, Args ...);
 
     template<class First, class ...Ts>
-    constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const {
+    constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const
+      noexcept(memptr{get(accessor_t<S, A, Args...>{})}.is_noexcept)
+    {
       return (get(accessor_t<S, A, Args...>{}, std::forward<First>(f), std::forward<Ts>(ts)...));
     }
 
     template<class Base, class ...Ts>
-    constexpr decltype(auto) call(Ts &&... ts) const {
+    constexpr decltype(auto) call(Ts &&... ts) const
+      noexcept(freeptr{get(accessor_t<S, A, Args...>{})}.is_noexcept)
+    {
       return (get(accessor_t<S, std::type_identity<Base> *, Ts...>{},
                   static_cast<std::type_identity<Base> *>(nullptr), std::forward<Ts>(ts)...));
     }
@@ -281,9 +294,9 @@ namespace access_private {
             >
   struct access_impl;
 
-  template<auto T, class Ptr, class Res, class Class, class ...Args,
+  template<auto T, class Ptr, class Res, class Class, bool noexc, bool varg, class ...Args,
             auto str> requires(std::is_reference_v<Class>)
-  struct access_impl<T, void, memptr<Ptr, Res, Class, Args...>, str, false> :
+  struct access_impl<T, void, memptr<Ptr, Res, Class, noexc, varg, Args...>, str, false> :
       accessor_t<str, Class, Args...> {
     using super_base = accessor_t<str>;
     using base = accessor_t<str, Class, Args...>;
@@ -297,9 +310,9 @@ namespace access_private {
     }
   };
 
-  template<auto T, class Ptr, class Res, class Class, class ...Args,
+  template<auto T, class Ptr, class Res, class Class, bool noexc, bool varg, class ...Args,
             auto str> requires(std::is_pointer_v<Class>)
-  struct access_impl<T, void, memptr<Ptr, Res, Class, Args...>, str, false> :
+  struct access_impl<T, void, memptr<Ptr, Res, Class, noexc, varg, Args...>, str, false> :
       accessor_t<str, Class, Args...>,
       accessor_t<str, std::remove_pointer_t<Class> &, Args...>,
       accessor_t<str, std::remove_pointer_t<Class> &&, Args...> {
@@ -331,7 +344,7 @@ namespace access_private {
 
   template<auto T, class Ptr, class Res, class Class,
             auto str> requires(!std::is_pointer_v<Class> && !std::is_reference_v<Class>)
-  struct access_impl<T, void, memptr<Ptr, Res, Class>, str, false> :
+  struct access_impl<T, void, memptr<Ptr, Res, Class, true, false>, str, false> :
       accessor_t<str, Class *>,
       accessor_t<str, const Class *>,
       accessor_t<str, volatile Class *>,
@@ -420,10 +433,10 @@ namespace access_private {
   };
 
 
-  template<auto T, class Base, class Ptr, class Res, class ...Args,
+  template<auto T, class Base, class Ptr, class Res, bool noexc, bool varg, class ...Args,
             auto str>
     requires(!std::is_void_v<Base>)
-  struct access_impl<T, Base, freeptr<Ptr, Res, Args...>, str, false> :
+  struct access_impl<T, Base, freeptr<Ptr, Res, noexc, varg, Args...>, str, false> :
       accessor_t<str, std::type_identity<Base> *, Args...> {
     using super_base = accessor_t<str>;
     using base = accessor_t<str, std::type_identity<Base> *, Args...>;
@@ -441,9 +454,9 @@ namespace access_private {
     }
   };
 
-  template<auto T, class Base, class Ptr, class Res, class ...Args,
+  template<auto T, class Base, class Ptr, class Res, bool noexc, bool varg, class ...Args,
             auto str>
-  struct access_impl<T, Base, freeptr<Ptr, Res, std::tuple<Args...> &&>, str, true> :
+  struct access_impl<T, Base, freeptr<Ptr, Res, noexc, varg, std::tuple<Args...> &&>, str, true> :
       accessor_t<str, std::type_identity<Base> *, Args...> {
     using super_base = accessor_t<str>;
     using base = accessor_t<str, std::type_identity<Base> *, Args...>;
@@ -458,9 +471,9 @@ namespace access_private {
   };
 
 
-  template<auto T, class Ptr, class Res, class Class, class ...Args,
+  template<auto T, class Ptr, class Res, class Class, bool noexc, bool varg, class ...Args,
             auto str> requires(std::is_pointer_v<Class>)
-  struct access_impl<T, void, memptr<Ptr, Res, Class, std::tuple<Args...> &&>, str, true> :
+  struct access_impl<T, void, memptr<Ptr, Res, Class, noexc, varg, std::tuple<Args...> &&>, str, true> :
       accessor_t<str, Class, Args...>,
       accessor_t<str, std::remove_pointer_t<Class> &, Args...>,
       accessor_t<str, std::remove_pointer_t<Class> &&, Args...> {
@@ -489,9 +502,9 @@ namespace access_private {
     }
   };
 
-  template<auto T, class Base, class Ptr, class Res, class ...Args,
+  template<auto T, class Base, class Ptr, class Res, bool noexc, bool varg, class ...Args,
             auto str>
-  struct access_impl<T, Base, freeptr<Ptr, Res, std::remove_reference_t<Res> *, std::tuple<Args...> &&>, str, true> :
+  struct access_impl<T, Base, freeptr<Ptr, Res, noexc, varg, std::remove_reference_t<Res> *, std::tuple<Args...> &&>, str, true> :
       accessor_t<str, std::type_identity<Base> *, std::remove_reference_t<Res> *, Args...> {
     using super_base = accessor_t<str>;
     using base = accessor_t<str, std::type_identity<Base> *, std::remove_reference_t<Res> *, Args...>;
@@ -615,44 +628,50 @@ namespace access_private {
 #define ACCESS_PRIVATE_VA_NUM_ARGS(...) ACCESS_PRIVATE_VA_NUM_ARGS_IMPL(__VA_ARGS__ __VA_OPT__(,) 9,8,7,6,5,4,3,2,1,0,E)
 #define ACCESS_PRIVATE_VA_NUM_ARGS_IMPL(_0, _1, _2, _3, _4, _5, _6, _7, _8, _9, N, ...) N
 
-#define constructor(T, ...) [] (std::tuple<__VA_ARGS__>&& t) {                                          \
+#define constructor(T, ...) [] (std::tuple<__VA_ARGS__>&& t) \
+  noexcept(std::is_nothrow_constructible_v<T __VA_OPT__(,) __VA_ARGS__>) {                                          \
     return T{ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__)}; \
 }
 
-#define constructing_at(T, ...) [] (T* p, std::tuple<__VA_ARGS__>&& t) -> T& {                                         \
+#define constructing_at(T, ...) [] (T* p, std::tuple<__VA_ARGS__>&& t) \
+  noexcept(std::is_nothrow_constructible_v<T __VA_OPT__(,) __VA_ARGS__>) -> T& {                                         \
     return *new (p) T{ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__)};    \
 }
-#define destructing_at(T) [] (T& p) { p.~T(); }
+#define destructing_at(T) [] (T& p) noexcept(std::is_nothrow_destructible_v<T>) { p.~T(); }
 
 #define call_member_function_with(T, member, ...) \
-template struct unique_access<[] (T* p, std::tuple<__VA_ARGS__>&& t) -> decltype(auto) {         \
+template struct unique_access<[] (T* p, std::tuple<__VA_ARGS__>&& t)\
+  noexcept(noexcept(p->member(ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__))))\
+  -> decltype(auto) {         \
     return p->member(ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__));  \
 }, #member>
 
 #define call_static_function_with(T, member, ...) \
-template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto) {         \
+template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) \
+  noexcept(noexcept(T::member(ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__))))\
+  -> decltype(auto) {         \
     return T::member(ACCESS_PRIVATE_GET_TUPLE_ARG(ACCESS_PRIVATE_VA_NUM_ARGS(__VA_ARGS__), __VA_ARGS__));  \
 }, #member, T>
 
-#define private_base(Derived, Base) [](Derived* p) -> Base* { return p; }
+#define private_base(Derived, Base) [](Derived* p) noexcept -> Base* { return p; }
 
 #define lambda_member_accessor(LType, Member) \
    [] { static_assert(false, "Lambda member access is not supported in clang"); }
 
 #elif not defined(_MSC_VER)
   template<class T, class ...Ts>
-  constexpr inline static auto constructor_ = [] (Ts...ts) -> T { return T{std::forward<Ts>(ts)...}; };
+  constexpr inline static auto constructor_ = [] (Ts...ts) noexcept(std::is_nothrow_constructible_v<T, Ts...>) -> T { return T{std::forward<Ts>(ts)...}; };
   template<class T, class ...Ts>
-  constexpr inline static auto construct_at_ = [] (T* p, Ts...ts) -> T& { return *new (p) T{std::forward<Ts>(ts)...}; };
+  constexpr inline static auto construct_at_ = [] (T* p, Ts...ts)  noexcept(std::is_nothrow_constructible_v<T, Ts...>) -> T& { return *new (p) T{std::forward<Ts>(ts)...}; };
   template<class T>
-  constexpr inline static auto destruct_at_ = [] (T& p) { p.~T(); };
+  constexpr inline static auto destruct_at_ = [] (T& p)  noexcept(std::is_nothrow_destructible_v<T>) { p.~T(); };
 
   template<class F, static_string S, class Args, class T, class ...Ts>
   constexpr inline static auto call_member_ = []{};
 
   template<class Derived, class Base>
-  constexpr inline static auto cast_base_ = [] (Derived* p) -> Base* {
-    static_assert(!std::is_same_v<Derived, Derived>, "Private base class access is not supported in gcc. See at http://tinyurl.com/gccprivatebaseclass");
+  constexpr inline static auto cast_base_ = [] (Derived* p) noexcept -> Base* {
+    static_assert(!std::is_same_v<Derived, Derived>, "Private base class access is not supported in gcc. See at https://tinyurl.com/gccprivatebaseclass");
     return p;
   };
 
@@ -662,14 +681,16 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
 
 #define call_member_function_with(T, member, ...) \
     template<class X, class ...Ts> \
-    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (X* p, Ts...ts) -> decltype(auto) { \
+    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (X* p, Ts...ts) \
+      noexcept(noexcept(p->member(std::forward<Ts>(ts)...))) -> decltype(auto) { \
         return p->member(std::forward<Ts>(ts)...); \
     };                                            \
     template struct unique_access<call_member_<T, #member, std::tuple<__VA_ARGS__>, T __VA_OPT__(,) __VA_ARGS__>, #member>
                                                   \
 #define call_static_function_with(T, member, ...) \
     template<class X, class ...Ts> \
-    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (Ts...ts) -> decltype(auto) { \
+    constexpr inline static auto call_member_<T, #member, std::tuple<__VA_ARGS__>, X, Ts...> = [] (Ts...ts) \
+      noexcept(noexcept(X::member(std::forward<Ts>(ts)...))) -> decltype(auto) { \
         return X::member(std::forward<Ts>(ts)...); \
     };                                            \
     template struct unique_access<call_member_<T, #member, std::tuple<__VA_ARGS__>, T __VA_OPT__(,) __VA_ARGS__>, #member, T>\
@@ -680,12 +701,12 @@ template struct unique_access<[] (std::tuple<__VA_ARGS__>&& t) -> decltype(auto)
    template struct unique_access<&LType::__ ## Member, #Member>
 
 #else
-#define constructor(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
-#define constructing_at(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
-#define destructing_at(T) [] { static_assert(false, "Private destructor access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
-#define call_member_function_with(T, member, ...) [] { static_assert(false, "Unique member function access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
-#define call_static_function_with(T, member, ...) [] { static_assert(false, "Unique static function access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
-#define private_base(Derived, Base) [] { static_assert(false, "Private base class access is not supported in visual studio. Please upvote http://tinyurl.com/msvcconstructor"); }
+#define constructor(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
+#define constructing_at(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
+#define destructing_at(T) [] { static_assert(false, "Private destructor access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
+#define call_member_function_with(T, member, ...) [] { static_assert(false, "Unique member function access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
+#define call_static_function_with(T, member, ...) [] { static_assert(false, "Unique static function access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
+#define private_base(Derived, Base) [] { static_assert(false, "Private base class access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
 
 #define lambda_member_accessor(LType, Member) \
     template struct access<&LType::Member>

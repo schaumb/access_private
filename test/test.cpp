@@ -180,7 +180,7 @@ namespace access_private {
 }
 
 void test_access_private_static() {
-  auto &i = access_private::accessor<"s_i">.static_ref<A>();
+  auto &i = access_private::accessor<"s_i">.on_type<A>();
   ASSERT(i == 404);
   ++i;
   ASSERT(A::get_s_i() == 405);
@@ -192,7 +192,7 @@ namespace access_private {
 }
 
 void test_access_private_static_const() {
-  auto &i = access_private::accessor<"s_ci">.static_ref<A>();
+  auto &i = access_private::accessor<"s_ci">.on_type<A>();
   static_assert(std::is_same<const int &, decltype(i)>::value, "");
   ASSERT(i == 403);
 }
@@ -202,7 +202,7 @@ namespace access_private {
 }
 
 void test_access_private_static_constexpr() {
-  static_assert(access_private::accessor<"s_cxi">.static_ref<A>() == 42, "");
+  static_assert(access_private::accessor<"s_cxi">.on_type<A>() == 42, "");
 }
 
 namespace access_private {
@@ -216,7 +216,7 @@ namespace access_private {
 }
 
 void test_call_private_static() {
-  auto l = access_private::accessor<"s_f">.call<A>(4);
+  auto l = access_private::accessor<"s_f">.on_type<A>(4);
   ASSERT(l == 5);
 }
 
@@ -231,7 +231,7 @@ namespace access_private {
 }
 
 void test_call_private_static_constexpr() {
-  static_assert(access_private::accessor<"s_cxf">.call<A>(5) == 10, "");
+  static_assert(access_private::accessor<"s_cxf">.on_type<A>(5) == 10, "");
 }
 
 class A3 {
@@ -296,9 +296,9 @@ namespace access_private {
 }
 
 void test_call_private_overloaded_static() {
-  auto c = access_private::accessor<"s_f">.call<A3>('A', 25);
+  auto c = access_private::accessor<"s_f">.on_type<A3>('A', 25);
   ASSERT(c == 'Z');
-  auto s = access_private::accessor<"s_f">.call<A3>(&*"Hello", std::string{"World"});
+  auto s = access_private::accessor<"s_f">.on_type<A3>(&*"Hello", std::string{"World"});
   ASSERT(s == "HelloWorld");
 }
 
@@ -315,8 +315,8 @@ namespace access_private {
 }
 
 void test_call_private_overloaded_static_constexpr() {
-  static_assert(access_private::accessor<"s_cxf">.call<A3>(3) == '3', "");
-  static_assert(*access_private::accessor<"s_cxf">.call<A3>(0.5f) == '5', "");
+  static_assert(access_private::accessor<"s_cxf">.on_type<A3>(3) == '3', "");
+  static_assert(*access_private::accessor<"s_cxf">.on_type<A3>(0.5f) == '5', "");
 }
 
 
