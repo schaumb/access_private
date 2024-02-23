@@ -105,9 +105,15 @@ MEM_PTR_GETTER_CV(&&,&&)
         while (true) {
           switch(sv[ix]) {
           case ' ':
+            --ix; break;
           case '&':
+            if (sv.substr(0, ix).ends_with("operator ") ||
+                sv.substr(0, ix).ends_with("operator &"))
+              return ix;
             --ix; break;
           case ')':
+            if (sv.substr(0, ix).ends_with("operator ("))
+              return ix;
             for (std::size_t brackets = 1;
                  brackets > 0;) {
               switch (sv[--ix]) {
@@ -122,8 +128,10 @@ MEM_PTR_GETTER_CV(&&,&&)
             break;
           case '>':
             if (sv.substr(0, ix).ends_with("operator ") ||
-                sv.substr(0, ix).ends_with("operator <="))
-              return ix+1;
+                sv.substr(0, ix).ends_with("operator <=") ||
+                sv.substr(0, ix).ends_with("operator >") ||
+                sv.substr(0, ix).ends_with("operator -"))
+              return ix;
             for (std::size_t brackets = 1;
                  brackets > 0;) {
               switch (sv[--ix]) {
@@ -160,8 +168,11 @@ MEM_PTR_GETTER_CV(&&,&&)
     constexpr std::string_view sv = __PRETTY_FUNCTION__;
     constexpr auto last = sv.find_last_not_of(" ])}");
 #endif
-      constexpr auto first =
+      constexpr auto firstx =
           sv.find_last_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789", last);
+      constexpr auto first = last == firstx ?
+          sv.find_last_not_of("+-*/%^&|~!=<>,()[]", last)
+          : firstx;
       static_assert(last != first);
       std::array<char, last - first + 1> res{};
       auto it = res.data();
@@ -210,6 +221,8 @@ MEM_PTR_GETTER_CV(&&,&&)
       for (auto ch: c)
         *p++ = ch;
     }
+
+    constexpr bool operator==(const static_string&) const = default;
 
     char arr[N]{};
   };
@@ -363,11 +376,11 @@ MEM_PTR_GETTER_CV(&&,&&)
     }
 
     friend constexpr decltype(auto) get(super_base, rptr &this_, Args... args) {
-      return (std::invoke(memptr{+T}.ptr, &this_, std::forward<Args>(args)...));
+      return (std::invoke(memptr{+T}.ptr, std::addressof(this_), std::forward<Args>(args)...));
     }
 
     friend constexpr decltype(auto) get(super_base, rptr &&this_, Args... args) {
-      return (std::invoke(memptr{+T}.ptr, &this_, std::forward<Args>(args)...));
+      return (std::invoke(memptr{+T}.ptr, std::addressof(this_), std::forward<Args>(args)...));
     }
   };
 
@@ -524,11 +537,11 @@ MEM_PTR_GETTER_CV(&&,&&)
     }
 
     friend constexpr decltype(auto) get(super_base, rptr &this_, Args... args) {
-      return (std::invoke(memptr{+T}.ptr, &this_, std::forward_as_tuple(std::forward<Args>(args)...)));
+      return (std::invoke(memptr{+T}.ptr, std::addressof(this_), std::forward_as_tuple(std::forward<Args>(args)...)));
     }
 
     friend constexpr decltype(auto) get(super_base, rptr &&this_, Args... args) {
-      return (std::invoke(memptr{+T}.ptr, &this_, std::forward_as_tuple(std::forward<Args>(args)...)));
+      return (std::invoke(memptr{+T}.ptr, std::addressof(this_), std::forward_as_tuple(std::forward<Args>(args)...)));
     }
   };
 

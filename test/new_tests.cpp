@@ -68,7 +68,104 @@ auto lambda_getter(int a) {
 
 auto lambda = lambda_getter(5);
 
+class ops_x {
+  using ops = ops_x;
+  constexpr void operator+() const noexcept{}
+  constexpr void operator-() const noexcept{}
+  constexpr void operator&() const noexcept{}
+  constexpr void operator*() const noexcept{}
+  constexpr void operator~() const noexcept {}
+  constexpr void operator!() const noexcept {}
+  constexpr void operator++() const noexcept {}
+  constexpr void operator++(int) const noexcept {}
+  constexpr void operator--() const noexcept {}
+  constexpr void operator--(int) const noexcept {}
+  constexpr void operator+(const ops&) const noexcept {}
+  constexpr void operator-(const ops&) const noexcept {}
+  constexpr void operator*(const ops&) const noexcept {}
+  constexpr void operator/(const ops&) const noexcept {}
+  constexpr void operator%(const ops&) const noexcept {}
+  constexpr void operator^(const ops&) const noexcept {}
+  constexpr void operator&(const ops&) const noexcept {}
+  constexpr void operator|(const ops&) const noexcept {}
+  constexpr void operator=(const ops&) const noexcept {}
+  constexpr void operator<(const ops&) const noexcept {}
+  constexpr void operator>(const ops&) const noexcept {}
+  constexpr void operator+=(const ops&) const noexcept {}
+  constexpr void operator-=(const ops&) const noexcept {}
+  constexpr void operator*=(const ops&) const noexcept {}
+  constexpr void operator/=(const ops&) const noexcept {}
+  constexpr void operator%=(const ops&) const noexcept {}
+  constexpr void operator^=(const ops&) const noexcept {}
+  constexpr void operator&=(const ops&) const noexcept {}
+  constexpr void operator|=(const ops&) const noexcept {}
+  constexpr void operator<<(const ops&) const noexcept {}
+  constexpr void operator>>(const ops&) const noexcept {}
+  constexpr void operator>>=(const ops&) const noexcept {}
+  constexpr void operator<<=(const ops&) const noexcept {}
+  constexpr void operator==(const ops&) const noexcept {}
+  constexpr void operator!=(const ops&) const noexcept {}
+  constexpr void operator<=(const ops&) const noexcept {}
+  constexpr void operator>=(const ops&) const noexcept {}
+  constexpr void operator<=>(const ops&) const noexcept {}
+  constexpr void operator&&(const ops&) const noexcept {}
+  constexpr void operator||(const ops&) const noexcept {}
+  constexpr void operator,(const ops&) const noexcept {}
+  constexpr void operator->*(const ops&) const noexcept {}
+  constexpr void operator()(const ops&) const noexcept {}
+  constexpr void operator[](const ops&) const noexcept {}
+  constexpr const ops* operator->() const noexcept { return nullptr; }
+};
+
 namespace access_private {
+  using ops = ops_x;
+
+  template struct access<overload<>(&ops::operator+)>;
+  template struct access<overload<>(&ops::operator-)>;
+  template struct access<overload<>(&ops::operator&)>;
+  template struct access<overload<>(&ops::operator*)>;
+  template struct access<&ops::operator~>;
+  template struct access<&ops::operator!>;
+  template struct access<overload<>(&ops::operator++)>;
+  template struct access<overload<int>(&ops::operator++)>;
+  template struct access<overload<>(&ops::operator--)>;
+  template struct access<overload<int>(&ops::operator--)>;
+  template struct access<overload<const ops&>(&ops::operator+)>;
+  template struct access<overload<const ops&>(&ops::operator-)>;
+  template struct access<overload<const ops&>(&ops::operator*)>;
+  template struct access<&ops::operator/>;
+  template struct access<(&ops::operator%)>;
+  template struct access<&ops::operator^>;
+  template struct access<overload<const ops&>(&ops::operator&)>;
+  template struct access<&ops::operator|>;
+  template struct access<&ops::operator=>;
+  template struct access<&ops::operator<>;
+  template struct access<(&ops::operator>)>;
+  template struct access<&ops::operator+=>;
+  template struct access<&ops::operator-=>;
+  template struct access<&ops::operator*=>;
+  template struct access<&ops::operator/=>;
+  template struct access<&ops::operator%=>;
+  template struct access<&ops::operator^=>;
+  template struct access<&ops::operator&=>;
+  template struct access<&ops::operator|=>;
+  template struct access<&ops::operator<<>;
+  template struct access<(&ops::operator>>)>;
+  template struct access<(&ops::operator>>=)>;
+  template struct access<&ops::operator<<=>;
+  template struct access<&ops::operator==>;
+  template struct access<&ops::operator!=>;
+  template struct access<(&ops::operator<=)>;
+  template struct access<(&ops::operator>=)>;
+  template struct access<(&ops::operator<=>)>;
+  template struct access<&ops::operator&&>;
+  template struct access<&ops::operator||>;
+  template struct access<&ops::operator,>;
+  template struct access<(&ops::operator->*)>;
+  template struct access<&ops::operator()>;
+  template struct access<&ops::operator[]>;
+  template struct access<(&ops::operator->)>;
+
   // access member variable
   template struct access<&A::a>;
 
@@ -261,6 +358,12 @@ int main() {
   accessor<"def2">.on_type<B>(1);
   accessor<"def2">.on_type<B>(1, 2.2f);
 #endif
+
+  constexpr ops_x thisis = ops_x{};
+  accessor<"+">(thisis);
+  accessor<"+">(thisis, thisis);
+  accessor<"++">(thisis);
+  accessor<"++">(thisis, 0);
 
 
 #if defined(__clang__)
