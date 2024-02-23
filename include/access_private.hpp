@@ -10,6 +10,7 @@ namespace access_private {
   struct freeptr {
     using res_type = Res;
     constexpr static bool is_noexcept = Noexcept;
+    constexpr static bool has_vararg = Vararg;
     constinit static const auto args = sizeof...(Args);
 
     constexpr freeptr(Ptr ptr) : ptr{ptr} {}
@@ -22,6 +23,7 @@ namespace access_private {
   template<class Ptr, class Res, class Class, bool Noexcept = true, bool Vararg = false, class ...Args>
   struct memptr {
     constexpr static bool is_noexcept = Noexcept;
+    constexpr static bool has_vararg = Vararg;
     constexpr memptr(Ptr ptr) : ptr{ptr} {}
 
     constexpr memptr operator+() const { return *this; }
@@ -34,20 +36,24 @@ namespace access_private {
   template<class Res, class ...Args>
   freeptr(Res (*)(Args...) noexcept) -> freeptr<Res(*)(Args...), Res, true, false, Args...>;
   template<class Res, class ...Args>
-  freeptr(Res (*)(Args..., ...)) -> freeptr<Res(*)(Args...), Res, false, true, Args...>;
+  freeptr(Res (*)(Args..., ...)) -> freeptr<Res(*)(Args..., ...), Res, false, true, Args...>;
   template<class Res, class ...Args>
-  freeptr(Res (*)(Args..., ...) noexcept) -> freeptr<Res(*)(Args...), Res, true, true, Args...>;
+  freeptr(Res (*)(Args..., ...) noexcept) -> freeptr<Res(*)(Args..., ...), Res, true, true, Args...>;
 
   template<class Res>
   freeptr(Res *) -> freeptr<Res *, Res>;
 
   template<class Res, class M, class ...Ts>
+    requires(std::is_class_v<M>)
   memptr(Res (* t)(M*, Ts...)) -> memptr<decltype(t), Res, M *, false, false, Ts...>;
   template<class Res, class M, class ...Ts>
+    requires(std::is_class_v<M>)
   memptr(Res (* t)(M*, Ts...) noexcept) -> memptr<decltype(t), Res, M *, true, false, Ts...>;
   template<class Res, class M, class ...Ts>
+    requires(std::is_class_v<M>)
   memptr(Res (* t)(M*, Ts..., ...)) -> memptr<decltype(t), Res, M *, false, true, Ts...>;
   template<class Res, class M, class ...Ts>
+    requires(std::is_class_v<M>)
   memptr(Res (* t)(M*, Ts..., ...) noexcept) -> memptr<decltype(t), Res, M *, true, true, Ts...>;
 
   template<class Res, class M>
@@ -115,6 +121,9 @@ MEM_PTR_GETTER_CV(&&,&&)
             }
             break;
           case '>':
+            if (sv.substr(0, ix).ends_with("operator ") ||
+                sv.substr(0, ix).ends_with("operator <="))
+              return ix+1;
             for (std::size_t brackets = 1;
                  brackets > 0;) {
               switch (sv[--ix]) {
@@ -153,6 +162,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
       constexpr auto first =
           sv.find_last_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789", last);
+      static_assert(last != first);
       std::array<char, last - first + 1> res{};
       auto it = res.data();
       for (auto a = first + 1; a <= last; ++a)
@@ -268,19 +278,39 @@ MEM_PTR_GETTER_CV(&&,&&)
     friend constexpr decltype(auto) get(accessor_t<S>, A, Args ...);
 
     template<class First, class ...Ts>
+      requires(!memptr{get(accessor_t<S, A, Args...>{})}.has_vararg)
     constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const
       noexcept(memptr{get(accessor_t<S, A, Args...>{})}.is_noexcept)
     {
       return (get(accessor_t<S, A, Args...>{}, std::forward<First>(f), std::forward<Ts>(ts)...));
     }
 
-    template<class Base, class ...Ts>
-    constexpr decltype(auto) call(Ts &&... ts) const
-      noexcept(freeptr{get(accessor_t<S, A, Args...>{})}.is_noexcept)
+    template<class First, class ...Ts>
+      requires(memptr{get(accessor_t<S, A, Args...>{})}.has_vararg)
+    constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const
+      noexcept(memptr{get(accessor_t<S, A, Args...>{})}.is_noexcept)
     {
-      return (get(accessor_t<S, std::type_identity<Base> *, Ts...>{},
+      return std::invoke(get(accessor_t<S, A, Args...>{}), std::forward<First>(f), std::forward<Ts>(ts)...);
+    }
+
+    template<class Base, class ...Ts>
+      requires(!freeptr{get(accessor_t<S, std::type_identity<Base> *, A, Args...>{})}.has_vararg)
+    constexpr decltype(auto) on_type(Ts &&... ts) const
+      noexcept(freeptr{get(accessor_t<S, std::type_identity<Base> *, A, Args...>{})}.is_noexcept)
+    {
+      return (get(accessor_t<S, std::type_identity<Base> *, A, Args...>{},
                   static_cast<std::type_identity<Base> *>(nullptr), std::forward<Ts>(ts)...));
     }
+
+    template<class Base, class ...Ts>
+      requires(freeptr{get(accessor_t<S, std::type_identity<Base> *, A, Args...>{})}.has_vararg)
+    constexpr decltype(auto) on_type(Ts &&... ts) const
+      noexcept(freeptr{get(accessor_t<S, std::type_identity<Base> *, A, Args...>{})}.is_noexcept)
+    {
+      return std::invoke(get(accessor_t<S, std::type_identity<Base> *, A, Args...>{}),
+        std::forward<Ts>(ts)...);
+    }
+
   };
 
 #if not defined(__clang__) and defined(__GNUC__)

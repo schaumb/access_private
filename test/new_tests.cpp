@@ -2,6 +2,7 @@
 #include "../include/overload.hpp"
 
 #include <cstdio>
+#include <cstdarg>
 
 class A {
   auto x(int, float) { return 4; }
@@ -16,6 +17,20 @@ class A {
 
   void def(int, float = 0.0f) {}
   void def2(int = 0, float = 0.0f) {}
+
+  void print(const char* f, ...) {
+    va_list list;
+    va_start(list, f);
+    std::vprintf(f, list);
+    va_end(list);
+  }
+
+  static void print_stat(const char* f, ...) {
+    va_list list;
+    va_start(list, f);
+    std::vprintf(f, list);
+    va_end(list);
+  }
 
   int a;
 
@@ -36,7 +51,7 @@ class B : A {
   static void def(int, float = 0.0f) {}
   static void def2(int = 0, float = 0.0f) {}
 
-  static constexpr const auto LAMBDA = [] { };
+  static constexpr auto LAMBDA = [] { };
   static const int maca{};
 };
 
@@ -73,6 +88,8 @@ namespace access_private {
   template struct access<man_overload<acc::volatile_, int>(&A::z)>;
   template struct access<man_overload<acc::volatile_ + acc::const_, int>(&A::z)>;
 
+  template struct access<&A::print>;
+
   // other class with same name
   template struct access<&B::z>;
 
@@ -98,6 +115,8 @@ namespace access_private {
   // overloaded static member function
   template struct access<overload<double>(&B::y), B>;
   template struct access<overload<int, float>(&B::y), B>;
+
+  template struct access<&A::print_stat, A>;
 #else
   // static member function
   call_static_function_with(B, cica);
@@ -105,6 +124,8 @@ namespace access_private {
   // overloaded static member function
   call_static_function_with(B, y, double);
   call_static_function_with(B, y, int, float);
+
+  call_static_function_with(A, print_stat, const char*, const char*, int);
 #endif
 
   // static member variables
@@ -186,6 +207,14 @@ int main() {
   using XT = type_accessor<A, "X">;
 
   XT copy_d = accessor<"d">(a);
+
+  accessor<"print", A&, const char*>(a, "%d %s\n", 4, "vararg function called");
+
+#if HAS_STATIC_MEMBER_FUNCTION
+  accessor<"print_stat", const char*>.on_type<A>("%s %d\n", "Static vararg called", 5);
+#else
+  accessor<"print_stat", const char*, const char*, int>.on_type<A>("%s %d\n", "Static vararg called", 5);
+#endif
 
   constexpr auto& p = accessor<"LAMBDA">.on_type<B>();
   constexpr auto* pp = accessor<"LAMBDA">.static_ptr<B>();
