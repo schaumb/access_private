@@ -196,6 +196,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
     constexpr auto first =
         sv.find_last_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789", last);
+    static_assert(last != first);
     std::array<char, last - first + 1> res{};
     auto it = res.data();
     for (auto a = first + 1; a <= last; ++a)
@@ -206,17 +207,17 @@ MEM_PTR_GETTER_CV(&&,&&)
   template<std::size_t N>
   struct static_string {
     consteval static_string(const char(&c)[N]) noexcept {
-      for (auto *p = arr; auto ch: c)
+      for (auto *p = arr.data(); auto ch: c)
         *p++ = ch;
     }
 
     consteval static_string(std::array<char, N> c) noexcept {
-      for (auto *p = arr; auto ch: c)
+      for (auto *p = arr.data(); auto ch: c)
         *p++ = ch;
     }
 
     consteval static_string(char prefix, std::array<char, N - 1> c) noexcept {
-      auto *p = arr;
+      auto *p = arr.data();
       *p++ = prefix;
       for (auto ch: c)
         *p++ = ch;
@@ -224,7 +225,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 
     constexpr bool operator==(const static_string&) const = default;
 
-    char arr[N]{};
+    std::array<char, N> arr{};
   };
 
   template<std::size_t N>
@@ -562,7 +563,7 @@ MEM_PTR_GETTER_CV(&&,&&)
     }
   };
 
-  template<auto T, class = void>
+  template<auto T, class = void, static_string = "">
   struct access;
 
   template<auto T> requires(requires { memptr{T}; })
@@ -592,6 +593,12 @@ MEM_PTR_GETTER_CV(&&,&&)
                                     > {
   };
 
+  template<auto T, class V, static_string str> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
+             std::is_void_v<typename decltype(freeptr{+T})::res_type>)
+  struct access<T, V, str> : access_impl<T, V, decltype(freeptr{+T}),
+                                    static_string{'~', str.arr}
+  > {};
+
   template<auto T, class V> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
              std::same_as<V &, typename decltype(freeptr{+T})::res_type>)
   struct access<T, V> : access_impl<T, V, decltype(freeptr{+T}),
@@ -599,15 +606,26 @@ MEM_PTR_GETTER_CV(&&,&&)
 #if defined(__clang__)
                                         , 1 < decltype(freeptr{+T})::args
 #endif
-                                    > {
-  };
+                                    > {};
+
+  template<auto T, class V, static_string str> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
+             std::same_as<V &, typename decltype(freeptr{+T})::res_type>)
+  struct access<T, V, str> : access_impl<T, V, decltype(freeptr{+T}), str
+#if defined(__clang__)
+                                        , 1 < decltype(freeptr{+T})::args
+#endif
+                                    > {};
 
   template<auto T> requires(!std::same_as<decltype(T), decltype(+T)> &&
-             std::is_pointer_v<typename decltype(freeptr{+T})::res_type>)
+             std::is_pointer_v<typename decltype(freeptr{+T})::res_type> && requires { memptr{+T}; })
   struct access<T, void> : access_impl<T, void, decltype(memptr{+T}),
                                    type_name<std::remove_pointer_t<typename decltype(freeptr{+T})::res_type>>()
                                     > {
   };
+
+  template<auto T, static_string str> requires(!std::same_as<decltype(T), decltype(+T)> &&
+             std::is_pointer_v<typename decltype(freeptr{+T})::res_type> && requires { memptr{+T}; })
+  struct access<T, void, str> : access_impl<T, void, decltype(memptr{+T}), str> {};
 
   template<auto T, static_string S, class V = void>
   struct unique_access;
@@ -640,8 +658,16 @@ MEM_PTR_GETTER_CV(&&,&&)
   template<static_string S, class ...Args>
   constexpr static accessor_t<S, Args...> accessor{};
 
-  template<class Base, class T>
+  template<class Base, class T, static_string rename = "">
   struct type_access
+      : accessor_t<rename, Base *> {
+    friend constexpr decltype(auto) get(accessor_t<rename>, Base *) {
+      return static_cast<T *>(nullptr);
+    }
+  };
+
+  template<class Base, class T>
+  struct type_access<Base, T>
       : accessor_t<type_name<T>(), Base *> {
     friend constexpr decltype(auto) get(accessor_t<type_name<T>()>, Base *) {
       return static_cast<T *>(nullptr);

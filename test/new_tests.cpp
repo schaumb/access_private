@@ -192,6 +192,8 @@ namespace access_private {
 
   // private type
   template struct type_access<A, A::X>;
+  // same with rename
+  template struct type_access<A, A::X, "MYX">;
   template struct access<&A::d>;
 
 
@@ -240,8 +242,13 @@ namespace access_private {
 
   // construction and destruction
   template struct access<constructing_at(C), C>;
+  // same with rename
+  template struct access<constructing_at(C), C, "MYC">;
+
   template struct access<constructing_at(C, const C&), C>;
   template struct access<destructing_at(C), C>;
+  // same with rename
+  template struct access<destructing_at(C), C, "MYC">;
 
   // unique parameters and default parameters
   call_member_function_with(A, def, unsigned int);
@@ -302,6 +309,8 @@ int main() {
   float (B::*bx)(int) const = accessor<"z">.ptr<const B&, int>();
 
   using XT = type_accessor<A, "X">;
+  using XT2 = type_accessor<A, "MYX">;
+  static_assert(std::is_same_v<XT, XT2>);
 
   XT copy_d = accessor<"d">(a);
 
@@ -339,14 +348,14 @@ int main() {
   U u;
   U oth;
 
-  C& c = accessor<"C">.on_type<C>(&u.c);
+  C& c = accessor<"MYC">.on_type<C>(&u.c);
   C& othC = accessor<"C">.on_type<C>(&oth.c, std::as_const(c));
 
   auto constr = accessor<"construct">.static_ptr<C, const C&>();
   // C &&anoth {constr(std::as_const(c))}; // this will not work, because ~C is private
 
   accessor<"~C">.on_type<C>(othC);
-  accessor<"~C">.on_type<C>(c);
+  accessor<"~MYC">.on_type<C>(c);
 
   accessor<"def">(a, 4u); // calls a.def(4) with second default argument
   accessor<"def2">(a);

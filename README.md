@@ -33,8 +33,7 @@ template struct access_private::access<&A::m_f>;
 
 void bar() {
   A a;
-  int p = 3;
-  auto res = access_private::accessor<"m_f">(a, std::move(p));
+  auto res = access_private::accessor<"m_f">(a, 3);
   assert(res == 42);
 }
 ```
