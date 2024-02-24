@@ -22,8 +22,11 @@ namespace access_private {
 
   template<class Ptr, class Res, class Class, bool Noexcept = true, bool Vararg = false, class ...Args>
   struct memptr {
+    using res_type = Res;
+    using class_type = Class;
     constexpr static bool is_noexcept = Noexcept;
     constexpr static bool has_vararg = Vararg;
+    constexpr static auto args = sizeof...(Args) ;
     constexpr memptr(Ptr ptr) : ptr{ptr} {}
 
     constexpr memptr operator+() const { return *this; }
@@ -82,6 +85,53 @@ MEM_PTR_GETTER_CV(&&,&&)
 #undef MEM_PTR_GETTER_CV
 #undef MEM_PTR_GETTER_NOE_VAR
 
+  template<std::size_t N>
+  struct static_string {
+    consteval static_string(const char(&c)[N]) noexcept {
+      for (auto *p = arr.data(); auto ch: c)
+        *p++ = ch;
+    }
+
+    consteval static_string(std::array<char, N> c) noexcept {
+      for (auto *p = arr.data(); auto ch: c)
+        *p++ = ch;
+    }
+
+    consteval static_string(char prefix, std::array<char, N - 1> c) noexcept {
+      auto *p = arr.data();
+      *p++ = prefix;
+      for (auto ch: c)
+        *p++ = ch;
+    }
+
+    consteval static_string(std::string_view sv) {
+      if (sv.size() != N-1)
+        throw;
+      for (auto *p = arr.data(); auto ch : sv)
+        *p++ = ch;
+      arr.back() = '\0';
+    }
+
+    constexpr bool operator==(const static_string&) const = default;
+    template<std::size_t M>
+      requires(N != M)
+    constexpr bool operator==(const static_string<M>&) const {
+      return false;
+    }
+
+    std::array<char, N> arr{};
+  };
+
+  template<std::size_t N>
+  static_string(char prefix, std::array<char, N> c) -> static_string<N + 1>;
+
+  template<static_string s>
+  struct helper {
+    constexpr explicit operator bool() const noexcept {
+      return false;
+    }
+  };
+
 #ifdef _MSC_VER
   template <class T> struct wrap {
     static T not_exists;
@@ -107,12 +157,12 @@ MEM_PTR_GETTER_CV(&&,&&)
           case ' ':
             --ix; break;
           case '&':
-            if (sv.substr(0, ix).ends_with("operator ") ||
-                sv.substr(0, ix).ends_with("operator &"))
+            if (sv.substr(0, ix).ends_with(" ") ||
+                sv.substr(0, ix).ends_with(" &"))
               return ix;
             --ix; break;
           case ')':
-            if (sv.substr(0, ix).ends_with("operator ("))
+            if (sv.substr(0, ix).ends_with(" ("))
               return ix;
             for (std::size_t brackets = 1;
                  brackets > 0;) {
@@ -127,10 +177,10 @@ MEM_PTR_GETTER_CV(&&,&&)
             }
             break;
           case '>':
-            if (sv.substr(0, ix).ends_with("operator ") ||
-                sv.substr(0, ix).ends_with("operator <=") ||
-                sv.substr(0, ix).ends_with("operator >") ||
-                sv.substr(0, ix).ends_with("operator -"))
+            if (sv.substr(0, ix).ends_with(" ") ||
+                sv.substr(0, ix).ends_with(" <=") ||
+                sv.substr(0, ix).ends_with(" >") ||
+                sv.substr(0, ix).ends_with(" -"))
               return ix;
             for (std::size_t brackets = 1;
                  brackets > 0;) {
@@ -163,17 +213,21 @@ MEM_PTR_GETTER_CV(&&,&&)
         }
         return ix;
       } (sv, sv.find_last_not_of(" >(}", sv.size() - 6));
-
+    constexpr std::string_view operator_suffix = "operator ";
 #else
     constexpr std::string_view sv = __PRETTY_FUNCTION__;
     constexpr auto last = sv.find_last_not_of(" ])}");
+    constexpr std::string_view operator_suffix = "operator";
 #endif
       constexpr auto firstx =
           sv.find_last_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789", last);
-      constexpr auto first = last == firstx ?
+      constexpr auto firsty = last == firstx ?
           sv.find_last_not_of("+-*/%^&|~!=<>,()[]", last)
           : firstx;
-      static_assert(last != first);
+      constexpr auto first =
+          last != firstx ? firstx : firsty >= operator_suffix.size() &&
+            sv.substr(firsty-operator_suffix.size()+1, operator_suffix.size()) == operator_suffix ?
+                firsty : last;
       std::array<char, last - first + 1> res{};
       auto it = res.data();
       for (auto a = first + 1; a <= last; ++a)
@@ -196,7 +250,6 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
     constexpr auto first =
         sv.find_last_not_of("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ_0123456789", last);
-    static_assert(last != first);
     std::array<char, last - first + 1> res{};
     auto it = res.data();
     for (auto a = first + 1; a <= last; ++a)
@@ -204,37 +257,17 @@ MEM_PTR_GETTER_CV(&&,&&)
     return res;
   }
 
-  template<std::size_t N>
-  struct static_string {
-    consteval static_string(const char(&c)[N]) noexcept {
-      for (auto *p = arr.data(); auto ch: c)
-        *p++ = ch;
-    }
-
-    consteval static_string(std::array<char, N> c) noexcept {
-      for (auto *p = arr.data(); auto ch: c)
-        *p++ = ch;
-    }
-
-    consteval static_string(char prefix, std::array<char, N - 1> c) noexcept {
-      auto *p = arr.data();
-      *p++ = prefix;
-      for (auto ch: c)
-        *p++ = ch;
-    }
-
-    constexpr bool operator==(const static_string&) const = default;
-
-    std::array<char, N> arr{};
-  };
-
-  template<std::size_t N>
-  static_string(char prefix, std::array<char, N> c) -> static_string<N + 1>;
-
   template<static_string S, class ...Args>
   struct accessor_t;
 
+  template<class ... Args>
+  struct accessor_t<"", Args...> {
+    constexpr static bool always_false = sizeof...(Args) != sizeof...(Args);
+    static_assert(always_false, "Cannot able to recognize the type name. Please use the overloaded access");
+  };
+
   template<static_string S>
+    requires(S != static_string{""})
   struct accessor_t<S> {
     template<class First, class ...Ts>
     constexpr auto operator()(First &&f, Ts &&... ts) const
@@ -286,6 +319,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
 
   template<static_string S, class A, class ...Args>
+    requires(S != static_string{""})
   struct accessor_t<S, A, Args...> : accessor_t<S> {
     friend constexpr auto get(accessor_t<S, A, Args...>);
 
@@ -566,15 +600,50 @@ MEM_PTR_GETTER_CV(&&,&&)
   template<auto T, class = void, static_string = "">
   struct access;
 
-  template<auto T> requires(requires { memptr{T}; })
-  struct access<T, void> : access_impl<memptr{T}> {
+  template<static_string T>
+  concept is_operator = std::string_view{T.data.data(), T.data.size()}.find_first_not_of("+-*/%^&|~!=<>,()[]") == std::string_view::npos;
+
+  template<auto T, class Res = typename decltype(memptr{T})::res_type>
+  concept is_conversion_op =
+    decltype(memptr{T})::args == 0 && !decltype(memptr{T})::has_vararg &&
+    !std::is_void_v<Res> &&
+#if not defined(__clang__) && defined(__GNUC__)
+    static_string{name_impl<decltype(T), T>()} == static_string{"__conv_op"}
+#else
+    !is_operator<name_impl<decltype(T), T>()> &&
+    static_string{name_impl<decltype(T), T>()} ==
+      static_string{type_name<Res>()}
+#endif
+  ;
+
+  // member / function
+  template<auto T> requires(requires { memptr{T}; } &&
+    !is_conversion_op<T>)
+  struct access<T> : access_impl<memptr{T}> {
   };
 
+  // conversion operator
+  template<auto T> requires(requires { memptr{T}; } &&
+    is_conversion_op<T>)
+  struct access<T> : access_impl<memptr{T}
+
+#if not defined(__clang__) && defined(__GNUC__)
+    , void, decltype(memptr{T}), type_name<typename decltype(memptr{T})::res_type>()
+#endif
+  > {};
+
+  // conversion operator with unique name
+  template<auto T, static_string str> requires(requires { memptr{T}; } &&
+    is_conversion_op<T>)
+  struct access<T, void, str> : access_impl<memptr{T}, void, decltype(memptr{T}), str> {};
+
+  // static member/function
   template<auto T, class V> requires(std::same_as<decltype(T), decltype(+T)> && requires { freeptr{T}; } &&
              !std::is_void_v<V>)
   struct access<T, V> : access_impl<freeptr{T}, V> {
   };
 
+  // constructor
   template<auto T, class V> requires(!std::same_as<decltype(T), decltype(+T)> &&
              !std::is_void_v<V> &&
              std::same_as<V, typename decltype(freeptr{+T})::res_type>)
@@ -586,6 +655,7 @@ MEM_PTR_GETTER_CV(&&,&&)
                                     > {
   };
 
+  // destruct_at
   template<auto T, class V> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
              std::is_void_v<typename decltype(freeptr{+T})::res_type>)
   struct access<T, V> : access_impl<T, V, decltype(freeptr{+T}),
@@ -593,12 +663,14 @@ MEM_PTR_GETTER_CV(&&,&&)
                                     > {
   };
 
+  // destruct_at with unique name
   template<auto T, class V, static_string str> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
              std::is_void_v<typename decltype(freeptr{+T})::res_type>)
   struct access<T, V, str> : access_impl<T, V, decltype(freeptr{+T}),
                                     static_string{'~', str.arr}
   > {};
 
+  // construct_at
   template<auto T, class V> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
              std::same_as<V &, typename decltype(freeptr{+T})::res_type>)
   struct access<T, V> : access_impl<T, V, decltype(freeptr{+T}),
@@ -608,6 +680,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
                                     > {};
 
+  // construct_at with unique name
   template<auto T, class V, static_string str> requires(!std::same_as<decltype(T), decltype(+T)> && !std::is_void_v<V> &&
              std::same_as<V &, typename decltype(freeptr{+T})::res_type>)
   struct access<T, V, str> : access_impl<T, V, decltype(freeptr{+T}), str
@@ -616,6 +689,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
                                     > {};
 
+  // base class conversion
   template<auto T> requires(!std::same_as<decltype(T), decltype(+T)> &&
              std::is_pointer_v<typename decltype(freeptr{+T})::res_type> && requires { memptr{+T}; })
   struct access<T, void> : access_impl<T, void, decltype(memptr{+T}),
@@ -623,10 +697,12 @@ MEM_PTR_GETTER_CV(&&,&&)
                                     > {
   };
 
+  // base class conversion with unique name
   template<auto T, static_string str> requires(!std::same_as<decltype(T), decltype(+T)> &&
              std::is_pointer_v<typename decltype(freeptr{+T})::res_type> && requires { memptr{+T}; })
   struct access<T, void, str> : access_impl<T, void, decltype(memptr{+T}), str> {};
 
+  // default or specific arguments
   template<auto T, static_string S, class V = void>
   struct unique_access;
   template<auto T, static_string S>
@@ -654,6 +730,7 @@ MEM_PTR_GETTER_CV(&&,&&)
 #endif
                                               > {
   };
+
 
   template<static_string S, class ...Args>
   constexpr static accessor_t<S, Args...> accessor{};

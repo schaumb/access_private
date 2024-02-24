@@ -115,6 +115,8 @@ class ops_x {
   constexpr void operator()(const ops&) const noexcept {}
   constexpr void operator[](const ops&) const noexcept {}
   constexpr const ops* operator->() const noexcept { return nullptr; }
+  explicit operator A() const noexcept { return A{}; }
+  explicit operator A&&() const noexcept { static A a; return std::move(a); }
 };
 
 namespace access_private {
@@ -165,6 +167,11 @@ namespace access_private {
   template struct access<&ops::operator()>;
   template struct access<&ops::operator[]>;
   template struct access<(&ops::operator->)>;
+
+  template struct access<&ops::operator A>;
+  template struct access<&ops::operator A, void, "conv_to_a">;
+  // template struct access<&ops::operator A&&>;
+  template struct access<&ops::operator A&&, void, "conv_to_a&&">;
 
   // access member variable
   template struct access<&A::a>;
@@ -370,6 +377,9 @@ int main() {
 #endif
 
   constexpr ops_x thisis = ops_x{};
+  A &&x1{accessor<"A">(thisis)};
+  A &&x2{accessor<"conv_to_a">(thisis)};
+  A &&x3{accessor<"conv_to_a&&">(thisis)};
   accessor<"+">(thisis);
   accessor<"+">(thisis, thisis);
   accessor<"++">(thisis);
