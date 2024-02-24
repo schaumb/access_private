@@ -264,6 +264,7 @@ namespace access_private {
 
 #if defined(__clang__)
   template struct access<private_base(B, A)>;
+  template struct access<private_base(B, A), void, "renamed">;
 #else
   lambda_member_accessor(decltype(lambda), a);
   lambda_member_accessor(decltype(lambda), b);
@@ -377,6 +378,7 @@ int main() {
 
 #if defined(__clang__)
   A* base = accessor<"A">(&X);
+  A* base2 = accessor<"renamed">(&X);
 #else
   int& ac = accessor<"a">(lambda);
   int& bc = accessor<"b">(lambda);
