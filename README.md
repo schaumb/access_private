@@ -40,7 +40,7 @@ void bar() {
 
 - You can call private member and static private functions, overloaded functions without macro keeping noexcept signature.
 - You can also access static private variables without macro.
-- You can invoke private operators and variadic functions without macro.
+- You can invoke private operators, conversion operators and variadic functions without macro.
 - You can invoke private constructors and the destructor.
 - You can invoke private member functions with the default arguments.
 - You can get private derived class addresses.
