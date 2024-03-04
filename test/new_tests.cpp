@@ -276,6 +276,8 @@ namespace access_private {
   lambda_member_accessor(decltype(lambda), a);
   lambda_member_accessor(decltype(lambda), b);
 #endif
+
+  constexpr decltype(auto) call(accessor_t<"y", B>, int, float);
 }
 int main() {
   using namespace access_private;
@@ -285,10 +287,15 @@ int main() {
 
   auto c1 = accessor<"x">(a, 1, 4.3f);
 
-  // accessor<"x">(a, 1, 4.3); not work because 2nd parameter must be match with function argument type
+  // accessor<"x">(a, 1, 4.3);
+  // not work because 2nd parameter must be match with function argument type (double != float)
+  // if you want to make it work, you need to define the exact parameters inside the access_private namespace:
+  // constexpr decltype(auto) call(accessor_t<"x">, A&, int, float);
+  // as caveat with this, you lose the noexcept specifier.
 
-  auto vv = accessor<"x", A&, int, float>(a, 1, 4.3); // call with double
-
+  auto vv = accessor<"x", A&, int, float>(a, 1, 4.3);
+  // or you can call with double if you specify the parameters at the accessor
+  // (MSVC will generate warning here because of double->float implicit conversion.)
 
   accessor<"y">(a, 0.0);
 
@@ -320,6 +327,9 @@ int main() {
   accessor<"cica", B>();
 
   accessor<"y", B>(0.1);
+
+  accessor<"y", B>(0, 4.3);
+  // the same strategy as above, but with static function.
 
 #if not defined(_MSC_VER)
   B X {accessor<"construct", B>()};

@@ -283,10 +283,20 @@ MEM_PTR_GETTER_CV(&&,&&)
 
     template<class First, class ...Ts>
       requires(std::is_class_v<std::remove_reference_t<First>>)
-    constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const
+    constexpr auto operator()(First &&f, Ts &&... ts) const
       noexcept(memptr{get(accessor_t<S, First &&, Ts...>{})}.is_noexcept)
+      -> decltype(std::invoke(get(accessor_t<S, First &&, Ts...>{}), std::forward<First>(f), std::forward<Ts>(ts)...))
     {
       return std::invoke(get(accessor_t<S, First &&, Ts...>{}), std::forward<First>(f), std::forward<Ts>(ts)...);
+    }
+
+    template<class First, class ...Ts>
+    requires(sizeof...(Ts) > 0 &&
+      requires { call(accessor_t{}, std::declval<First>(), std::declval<Ts>()...); })
+    constexpr decltype(auto) operator()(First &&f, Ts &&... ts) const volatile
+      noexcept(noexcept(call(accessor_t{}, std::forward<First>(f), std::forward<Ts>(ts)...)))
+    {
+      return call(accessor_t{}, std::forward<First>(f), std::forward<Ts>(ts)...);
     }
   };
 
@@ -357,19 +367,29 @@ MEM_PTR_GETTER_CV(&&,&&)
     friend constexpr auto get(accessor_t);
 
     template<class ...Ts>
-    constexpr decltype(auto) operator()(Ts &&... ts) const
-    noexcept(freeptr{get(accessor_t<S, Base, Ts...>{})}.is_noexcept) {
-      if constexpr (std::is_function_v<std::remove_pointer_t<decltype(get(accessor_t<S, Base, Ts...>{}))>>)
-        return std::invoke(get(accessor_t<S, Base, Ts...>{}), std::forward<Ts>(ts)...);
-      else {
-        static_assert(sizeof...(Ts) == 0);
-        return *get(accessor_t<S, Base>{});
-      }
+      requires(std::is_function_v<std::remove_pointer_t<decltype(get(accessor_t<S, Base, Ts...>{}))>>)
+    constexpr auto operator()(Ts &&... ts) const
+    noexcept(freeptr{get(accessor_t<S, Base, Ts...>{})}.is_noexcept)
+      -> decltype(std::invoke(get(accessor_t<S, Base, Ts...>{}), std::forward<Ts>(ts)...))
+    {
+      return std::invoke(get(accessor_t<S, Base, Ts...>{}), std::forward<Ts>(ts)...);
     }
 
-    friend constexpr decltype(auto) call(accessor_t)
+    template<class ...Ts>
+      requires(!std::is_function_v<std::remove_pointer_t<decltype(get(accessor_t<S, Base, Ts...>{}))>> &&
+            sizeof...(Ts) == 0)
+    constexpr auto operator()(Ts &&...) const noexcept
+          -> decltype(*get(accessor_t<S, Base, Ts...>{})) {
+      return *get(accessor_t<S, Base, Ts...>{});
+    }
+
+    template<class ...Ts>
+        requires(sizeof...(Ts) > 0 &&
+          requires { call(accessor_t{}, std::declval<Ts>()...); })
+    constexpr decltype(auto) operator()(Ts &&... ts) const volatile
+      noexcept(noexcept(call(accessor_t{}, std::forward<Ts>(ts)...)))
     {
-        return accessor_t{}();
+      return call(accessor_t{}, std::forward<Ts>(ts)...);
     }
   };
 
@@ -385,7 +405,7 @@ MEM_PTR_GETTER_CV(&&,&&)
       return std::invoke(get(accessor_t{}), std::forward<Ts>(ts)...);
     }
 
-    friend constexpr decltype(auto) call(accessor_t, Args ...args)
+    friend constexpr decltype(auto) call(accessor_t<S, Base>, Args ...args)
     {
       return accessor_t{}(std::forward<Args>(args)...);
     }
@@ -442,7 +462,7 @@ MEM_PTR_GETTER_CV(&&,&&)
   struct access;
 
   template<static_string T>
-  concept is_operator = std::string_view{T.data.data(), T.data.size()}.find_first_not_of("+-*/%^&|~!=<>,()[]") == std::string_view::npos;
+  concept is_operator = std::string_view{T.data}.find_first_not_of("+-*/%^&|~!=<>,()[]") == std::string_view::npos;
 
   template<auto T, class Res = typename decltype(memptr{T})::res_type>
   concept is_conversion_op =

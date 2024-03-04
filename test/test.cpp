@@ -138,12 +138,15 @@ void test_access_private_constexpr() {
 
 namespace access_private {
   template struct access<&A::m_f>;
+
+  // this will makes to work with lvalue int argument too
+  constexpr decltype(auto) call(accessor_t<"m_f">, A&, int);
 }
 
 void test_call_private_in_lvalue_expr() {
   A a;
   int p = 3;
-  auto res = access_private::accessor<"m_f">(a, std::move(p));
+  auto res = access_private::accessor<"m_f">(a, p);
   ASSERT(res == 42);
 }
 void test_call_private_in_prvalue_expr() {
