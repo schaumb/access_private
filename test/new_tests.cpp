@@ -198,9 +198,9 @@ namespace access_private {
   template struct access<&B::z>;
 
   // private type
-  template struct type_access<A, A::X>;
+  template struct type_access<A::X, A>;
   // same with rename
-  template struct type_access<A, A::X, "MYX">;
+  template struct type_access<A::X, A, "MYX">;
   template struct access<&A::d>;
 
 
@@ -279,19 +279,6 @@ namespace access_private {
 }
 int main() {
   using namespace access_private;
-  constexpr std::array ptr = {
-      // returns with the same mem-ptrs
-      accessor<"a">.ptr<A*>(),
-      accessor<"a">.ptr<const A*>(),
-      accessor<"a">.ptr<volatile A*>(),
-      accessor<"a">.ptr<A&>(),
-  };
-
-  constexpr std::array ptrs2 = {
-      // returns with the same mem funcptr
-      accessor<"x">.ptr<A*, int, float>(),
-      accessor<"x">.ptr<A&, int, float>(),
-  };
 
   A a;
   auto& aa = accessor<"a">(&a);
@@ -300,8 +287,7 @@ int main() {
 
   // accessor<"x">(a, 1, 4.3); not work because 2nd parameter must be match with function argument type
 
-  constexpr auto accing = accessor<"x">.ptr<A*, int, float>();
-  auto vv = std::invoke(accing, a, 1, 4.3); // call with double
+  auto vv = accessor<"x", A&, int, float>(a, 1, 4.3); // call with double
 
 
   accessor<"y">(a, 0.0);
@@ -314,10 +300,8 @@ int main() {
   static_assert(noexcept(accessor<"z">(std::add_pointer_t<volatile A>{nullptr}, 0)));
   static_assert(!noexcept(accessor<"z">(std::add_pointer_t<const volatile A>{nullptr}, 0)));
 
-  float (B::*bx)(int) const = accessor<"z">.ptr<const B&, int>();
-
-  using XT = type_accessor<A, "X">;
-  using XT2 = type_accessor<A, "MYX">;
+  using XT = type_accessor<"X", A>;
+  using XT2 = type_accessor<"MYX", A>;
   static_assert(std::is_same_v<XT, XT2>);
 
   XT copy_d = accessor<"d">(a);
@@ -325,26 +309,21 @@ int main() {
   accessor<"print", A&, const char*>(a, "%d %s\n", 4, "vararg function called");
 
 #if HAS_STATIC_MEMBER_FUNCTION
-  accessor<"print_stat", const char*>.on_type<A>("%s %d\n", "Static vararg called", 5);
+  accessor<"print_stat", A, const char*>("%s %d\n", "Static vararg called", 5);
 #else
-  accessor<"print_stat", const char*, const char*, int>.on_type<A>("%s %d\n", "Static vararg called", 5);
+  accessor<"print_stat", A, const char*, const char*, int>("%s %d\n", "Static vararg called", 5);
 #endif
 
-  constexpr auto& p = accessor<"LAMBDA">.on_type<B>();
-  constexpr auto* pp = accessor<"LAMBDA">.static_ptr<B>();
-  // auto p2 = accessor<"maca">.on_type<B>(); // only copy is possible
-  static_assert(&p == pp);
+  constexpr auto& p = accessor<"LAMBDA", B>();
   p();
 
-  accessor<"cica">.on_type<B>();
+  accessor<"cica", B>();
 
-  constexpr void (*sp)(double) = accessor<"y">.static_ptr<B, double>();
-
-  accessor<"y">.on_type<B>(0.1);
+  accessor<"y", B>(0.1);
 
 #if not defined(_MSC_VER)
-  B X {accessor<"construct">.on_type<B>()};
-  B X2 = accessor<"construct">.on_type<B>(1, 2.2);
+  B X {accessor<"construct", B>()};
+  B X2 = accessor<"construct", B>(1, 2.2);
 
   union U {
     char arr;
@@ -356,24 +335,23 @@ int main() {
   U u;
   U oth;
 
-  C& c = accessor<"MYC">.on_type<C>(&u.c);
-  C& othC = accessor<"C">.on_type<C>(&oth.c, std::as_const(c));
+  C& c = accessor<"MYC", C>(&u.c);
+  C& othC = accessor<"C", C>(&oth.c, std::as_const(c));
 
-  auto constr = accessor<"construct">.static_ptr<C, const C&>();
-  // C &&anoth {constr(std::as_const(c))}; // this will not work, because ~C is private
+  // C &&anoth {accessor<"construct">(std::as_const(c))}; // this will not work, because ~C is private
 
-  accessor<"~C">.on_type<C>(othC);
-  accessor<"~MYC">.on_type<C>(c);
+  accessor<"~C", C>(othC);
+  accessor<"~MYC", C>(c);
 
   accessor<"def">(a, 4u); // calls a.def(4) with second default argument
   accessor<"def2">(a);
   accessor<"def2">(a, 1);
   accessor<"def2">(a, 1, 2.2f);
 
-  accessor<"def">.on_type<B>(4l);
-  accessor<"def2">.on_type<B>();
-  accessor<"def2">.on_type<B>(1);
-  accessor<"def2">.on_type<B>(1, 2.2f);
+  accessor<"def", B>(4l);
+  accessor<"def2", B>();
+  accessor<"def2", B>(1);
+  accessor<"def2", B>(1, 2.2f);
 #endif
 
   constexpr ops_x thisis = ops_x{};
