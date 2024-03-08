@@ -269,16 +269,24 @@ namespace access_private {
   call_static_function_with(B, def2, int, float);
 #endif
 
-#if defined(__clang__)
   template struct access<private_base(B, A)>;
   template struct access<private_base(B, A), void, "renamed">;
-#else
+
+#ifndef __clang__
   lambda_member_accessor(decltype(lambda), a);
   lambda_member_accessor(decltype(lambda), b);
 #endif
 
   constexpr decltype(auto) call(accessor_t<"y", B>, int, float);
 }
+
+constinit B cxa{access_private::accessor<"construct", B>()};
+
+#ifdef __clang__ // constexpr base class conversion only works at clang
+constinit A* cxtoB = access_private::accessor<"A">(&cxa);
+#endif
+
+
 int main() {
   using namespace access_private;
 
@@ -374,10 +382,10 @@ int main() {
   accessor<"++">(thisis, 0);
 
 
-#if defined(__clang__)
   A* base = accessor<"A">(&X);
   A* base2 = accessor<"renamed">(&X);
-#else
+
+#ifndef __clang__
   int& ac = accessor<"a">(lambda);
   int& bc = accessor<"b">(lambda);
 #endif

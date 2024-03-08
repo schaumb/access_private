@@ -667,8 +667,12 @@ template struct unique_access<[] (ACCESS_PRIVATE_FOREACH_ARG(ACCESS_PRIVATE_DECL
 
   template<class Derived, class Base>
   constexpr inline static auto cast_base_ = [] (Derived* p) noexcept -> Base* {
-    static_assert(!std::is_same_v<Derived, Derived>, "Private base class access is not supported in gcc. See at https://tinyurl.com/gccprivatebaseclass");
-    return p;
+    if constexpr (std::is_pointer_interconvertible_base_of_v<Base, Derived>) {
+      return reinterpret_cast<Base*>(p);
+    } else {
+      static_assert(std::is_pointer_interconvertible_base_of_v<Base, Derived>, "Private base class access is not supported in gcc. See at https://tinyurl.com/gccprivatebaseclass");
+      return p;
+    }
   };
 
 #define constructor(T, ...) ::access_private::constructor_<T __VA_OPT__(,) __VA_ARGS__>
@@ -697,12 +701,17 @@ template struct unique_access<[] (ACCESS_PRIVATE_FOREACH_ARG(ACCESS_PRIVATE_DECL
    template struct unique_access<&LType::__ ## Member, #Member>
 
 #else
+  template<class Derived, class Base>
+  constexpr inline static auto cast_base_ = [] (Derived* p) noexcept -> Base* {
+    static_assert(std::is_pointer_interconvertible_base_of_v<Base, Derived>, "Private base class access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor");
+    return reinterpret_cast<Base*>(p);
+  };
 #define constructor(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
 #define constructing_at(T, ...) [] { static_assert(false, "Private constructor access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
 #define destructing_at(T) [] { static_assert(false, "Private destructor access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
 #define call_member_function_with(T, member, ...) [] { static_assert(false, "Unique member function access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
 #define call_static_function_with(T, member, ...) [] { static_assert(false, "Unique static function access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
-#define private_base(Derived, Base) [] { static_assert(false, "Private base class access is not supported in visual studio. Please upvote https://tinyurl.com/msvcconstructor"); }
+#define private_base(Derived, Base) ::access_private::cast_base_<Derived, Base>
 
 #define lambda_member_accessor(LType, Member) \
     template struct access<&LType::Member>
