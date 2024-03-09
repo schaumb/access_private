@@ -285,6 +285,11 @@ namespace access_private {
 
   template struct type_access_at<&Derived::member>;
 
+  using BaseType = type_accessor_at<"member">; // Base
+  template struct access<private_base(Derived, BaseType)>;
+  // only works with private base enabled.
+  template struct access<&Derived::member, Derived>;
+
   constexpr decltype(auto) call(accessor_t<"y", B>, int, float);
 }
 
@@ -304,6 +309,10 @@ static_assert(
 
 int main() {
   using namespace access_private;
+
+  Derived d{};
+  auto*& m = accessor<"member">(d);
+  auto*& m2 = accessor<"member">(&d);
 
   A a;
   auto& aa = accessor<"a">(&a);

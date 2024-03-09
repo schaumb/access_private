@@ -33,6 +33,12 @@ namespace access_private {
     constexpr memptr operator+() const { return *this; }
 
     Ptr ptr;
+
+    template<class Other>
+      requires (std::is_base_of_v<Class, Other> || std::is_base_of_v<Other, Class>)
+    memptr<Ptr, Res, Other, Noexcept, Vararg, Args...> with_type() const noexcept {
+      return {ptr};
+    }
   };
 
   template<class Res, class ...Args>
@@ -282,8 +288,9 @@ MEM_PTR_GETTER_CV(&&,&&)
 
     template<class First, class ...Ts>
       requires(std::is_pointer_v<std::remove_reference_t<First>>)
-    constexpr decltype(auto) operator()(First f, Ts &&... ts) const
+    constexpr auto operator()(First f, Ts &&... ts) const
       noexcept(memptr{get(accessor_t<S, std::remove_reference_t<First>, Ts...>{})}.is_noexcept)
+      -> decltype(std::invoke(get(accessor_t<S, std::remove_reference_t<First>, Ts...>{}), std::forward<First>(f), std::forward<Ts>(ts)...))
     {
       return std::invoke(get(accessor_t<S, std::remove_reference_t<First>, Ts...>{}),
         std::forward<First>(f), std::forward<Ts>(ts)...);
@@ -296,6 +303,34 @@ MEM_PTR_GETTER_CV(&&,&&)
       -> decltype(std::invoke(get(accessor_t<S, First &&, Ts...>{}), std::forward<First>(f), std::forward<Ts>(ts)...))
     {
       return std::invoke(get(accessor_t<S, First &&, Ts...>{}), std::forward<First>(f), std::forward<Ts>(ts)...);
+    }
+
+    template<class First, class ...Ts>
+      requires(std::is_pointer_v<std::remove_reference_t<First>> &&
+        !std::is_same_v<std::remove_pointer_t<std::remove_reference_t<First>>,
+        typename decltype(memptr{get(accessor_t<S, std::remove_reference_t<First>, Ts...>{})})::class_type> &&
+      type_name<typename decltype(memptr{get(accessor_t<S, std::remove_reference_t<First>, Ts...>{})})::class_type>().size() > 1)
+    constexpr decltype(auto) operator()(First f, Ts &&... ts) const
+    noexcept(memptr{get(accessor_t<S, std::remove_reference_t<First>, Ts...>{})}.is_noexcept &&
+      memptr{get(accessor_t<type_name<typename decltype(memptr{get(accessor_t<S, std::remove_reference_t<First>, Ts...>{})})::class_type>(), std::remove_reference_t<First>>{})}.is_noexcept)
+    {
+      return std::invoke(get(accessor_t<S, std::remove_reference_t<First>, Ts...>{}),
+        accessor_t<type_name<typename decltype(memptr{get(accessor_t<S, std::remove_reference_t<First>, Ts...>{})})::class_type>(), std::remove_reference_t<First>>{}(std::forward<First>(f)),
+        std::forward<Ts>(ts)...);
+    }
+
+    template<class First, class ...Ts>
+      requires(std::is_class_v<std::remove_reference_t<First>> &&
+        !std::is_same_v<std::remove_reference_t<First>,
+        typename decltype(memptr{get(accessor_t<S, First &&, Ts...>{})})::class_type> &&
+      type_name<typename decltype(memptr{get(accessor_t<S, First &&, Ts...>{})})::class_type>().size() > 1)
+    constexpr decltype(auto) operator()(First f, Ts &&... ts) const
+      noexcept(memptr{get(accessor_t<S, First &&, Ts...>{})}.is_noexcept &&
+        memptr{get(accessor_t<type_name<typename decltype(memptr{get(accessor_t<S, First &&, Ts...>{})})::class_type>(), First &&>{})}.is_noexcept)
+    {
+      return std::invoke(get(accessor_t<S, First &&, Ts...>{}),
+      accessor_t<type_name<typename decltype(memptr{get(accessor_t<S, First &&, Ts...>{})})::class_type>(), First &&>{}(std::forward<First>(f)),
+        std::forward<Ts>(ts)...);
     }
 
     template<class First, class ...Ts>
@@ -464,31 +499,49 @@ MEM_PTR_GETTER_CV(&&,&&)
   template<auto T, class = void, static_string = "">
   struct access;
 
-  template<static_string T>
-  concept is_operator = std::string_view{T.data}.find_first_not_of("+-*/%^&|~!=<>,()[]") == std::string_view::npos;
+  template<auto T, class Res = typename decltype(memptr{T})::res_type,
+    static_string N = name_impl<decltype(T), T>()>
+  concept is_operator = std::string_view{N.data}.find_first_not_of("+-*/%^&|~!=<>,()[]") == std::string_view::npos;
 
-  template<auto T, class Res = typename decltype(memptr{T})::res_type>
+  template<auto T, class Res = typename decltype(memptr{T})::res_type,
+    static_string N = name_impl<decltype(T), T>()>
   concept is_conversion_op =
     decltype(memptr{T})::args == 0 && !decltype(memptr{T})::has_vararg &&
     !std::is_void_v<Res> &&
 #if not defined(__clang__) && defined(__GNUC__)
-    static_string{name_impl<decltype(T), T>()} == static_string{"__conv_op"}
+    static_string{N} == static_string{"__conv_op"}
 #else
-    !is_operator<name_impl<decltype(T), T>()> &&
-    static_string{name_impl<decltype(T), T>()} ==
+    !is_operator<T, Res, N> &&
+    static_string{N} ==
       static_string{type_name<Res>()}
 #endif
   ;
 
   // member / function
-  template<auto T> requires(requires { memptr{T}; } &&
-    !is_conversion_op<T>)
+  template<auto T>
+    requires(requires { memptr{T}; } && !is_conversion_op<T> && !is_operator<T>)
+  struct access<T> : access_impl<memptr{T}> {
+  };
+
+  template<auto T, class M>
+    requires(requires { memptr{T}; } && !requires{ freeptr{T}; } && !is_conversion_op<T> && !is_operator<T> &&
+    !std::is_void_v<M> &&
+    !std::is_same_v<typename decltype(memptr{T})::class_type, M> &&
+    std::is_base_of_v<typename decltype(memptr{T})::class_type, M>
+    )
+  struct access<T, M> : access_impl<memptr{T},
+    void, decltype(memptr{T}.template with_type<M>())> {
+      static_assert(requires { accessor_t<type_name<typename decltype(memptr{T})::class_type>()>{}(static_cast<M*>(nullptr)); },
+        "Please add private_base class conversion");
+  };
+
+  // operator
+  template<auto T> requires(is_operator<T>)
   struct access<T> : access_impl<memptr{T}> {
   };
 
   // conversion operator
-  template<auto T> requires(requires { memptr{T}; } &&
-    is_conversion_op<T>)
+  template<auto T> requires(is_conversion_op<T>)
   struct access<T> : access_impl<memptr{T}
 
 #if not defined(__clang__) && defined(__GNUC__)
