@@ -1,19 +1,16 @@
 #ifndef ACCESS_PRIVATE_20_OVERLOAD_H
 #define ACCESS_PRIVATE_20_OVERLOAD_H
 
-#include "access_private.hpp"
-
 #include <type_traits>
 #include <utility>
-#include <functional>
 
 namespace access_private {
 
 #define MEM_PTR_NOE_VAR(CV_, REF_, REF_P_, ...) \
 template<class Res, class M> \
-consteval auto operator()(Res (M::* t)(Ts... __VA_ARGS__) CV_ REF_) CV_ REF_P_ noexcept { return memptr{t}; } \
+consteval auto operator()(Res (M::* t)(Ts... __VA_ARGS__) CV_ REF_) CV_ REF_P_ noexcept { return t; } \
 template<class Res, class M> \
-consteval auto operator()(Res (M::* t)(Ts... __VA_ARGS__) CV_ REF_ noexcept) CV_ REF_P_ noexcept { return memptr{t}; }
+consteval auto operator()(Res (M::* t)(Ts... __VA_ARGS__) CV_ REF_ noexcept) CV_ REF_P_ noexcept { return t; }
 
 #define MEM_PTR_CV(REF_, REF_P_, ...) \
 MEM_PTR_NOE_VAR(, REF_, REF_P_, __VA_ARGS__) \
@@ -28,7 +25,7 @@ MEM_PTR_NOE_VAR(const volatile, REF_, REF_P_, __VA_ARGS__)
   struct overload_t<false, false, Ts...> {
     template<class Res>
     consteval auto operator()(Res (*t)(Ts...)) noexcept {
-      return freeptr{t};
+      return t;
     }
 
     MEM_PTR_CV(,)
@@ -45,7 +42,7 @@ MEM_PTR_NOE_VAR(const volatile, REF_, REF_P_, __VA_ARGS__)
   struct overload_t<false, true, Ts...> {
     template<class Res>
     consteval auto operator()(Res (*t)(Ts..., ...)) noexcept {
-      return freeptr{t};
+      return t;
     }
 
     MEM_PTR_CV(,,, ...)

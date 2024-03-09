@@ -119,6 +119,12 @@ class ops_x {
   explicit operator A&&() const noexcept { static A a; return std::move(a); }
 };
 
+class Base {
+  int *member;
+};
+
+class Derived : Base {};
+
 namespace access_private {
   using ops = ops_x;
 
@@ -277,15 +283,24 @@ namespace access_private {
   lambda_member_accessor(decltype(lambda), b);
 #endif
 
+  template struct type_access_at<&Derived::member>;
+
   constexpr decltype(auto) call(accessor_t<"y", B>, int, float);
 }
 
+#ifndef _MSC_VER // no constructor at MSVC
 constinit B cxa{access_private::accessor<"construct", B>()};
 
 #ifdef __clang__ // constexpr base class conversion only works at clang
 constinit A* cxtoB = access_private::accessor<"A">(&cxa);
 #endif
+#endif
 
+static_assert(
+  std::is_same_v<access_private::type_accessor_at<"member">, Base>);
+
+static_assert(
+  std::is_same_v<access_private::type_result_at<"member">, int*>);
 
 int main() {
   using namespace access_private;
@@ -339,8 +354,10 @@ int main() {
   accessor<"y", B>(0, 4.3);
   // the same strategy as above, but with static function.
 
+  B *xx{};
 #if not defined(_MSC_VER)
   B X {accessor<"construct", B>()};
+  xx = &X;
   B X2 = accessor<"construct", B>(1, 2.2);
 
   union U {
@@ -382,8 +399,8 @@ int main() {
   accessor<"++">(thisis, 0);
 
 
-  A* base = accessor<"A">(&X);
-  A* base2 = accessor<"renamed">(&X);
+  A* base = accessor<"A">(xx);
+  A* base2 = accessor<"renamed">(xx);
 
 #ifndef __clang__
   int& ac = accessor<"a">(lambda);

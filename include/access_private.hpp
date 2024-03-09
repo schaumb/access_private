@@ -269,9 +269,17 @@ MEM_PTR_GETTER_CV(&&,&&)
     static_assert(always_false, "Cannot able to recognize the type name. Please use the overloaded access");
   };
 
+#if not defined(__clang__) and defined(__GNUC__)
+#   pragma GCC diagnostic push
+#   pragma GCC diagnostic ignored "-Wnon-template-friend"
+#endif
+
   template<static_string S>
     requires(S != static_string{""})
   struct accessor_t<S> {
+    friend constexpr auto contain_type(accessor_t);
+    friend constexpr auto member_type(accessor_t);
+
     template<class First, class ...Ts>
       requires(std::is_pointer_v<std::remove_reference_t<First>>)
     constexpr decltype(auto) operator()(First f, Ts &&... ts) const
@@ -299,11 +307,6 @@ MEM_PTR_GETTER_CV(&&,&&)
       return call(accessor_t{}, std::forward<First>(f), std::forward<Ts>(ts)...);
     }
   };
-
-#if not defined(__clang__) and defined(__GNUC__)
-#   pragma GCC diagnostic push
-#   pragma GCC diagnostic ignored "-Wnon-template-friend"
-#endif
 
   template<static_string S, class A, class ...Args>
     requires(S != static_string{""} && std::is_reference_v<A>)
@@ -599,6 +602,22 @@ MEM_PTR_GETTER_CV(&&,&&)
 
   template<static_string S, class Base>
   using type_accessor = std::remove_pointer_t<decltype(accessor_t<S, Base>{}())>;
+
+  template<auto T, static_string S = name_impl<decltype(memptr{T}.ptr), memptr{T}.ptr>()>
+  struct type_access_at : accessor_t<S> {
+    friend constexpr auto contain_type(accessor_t<S>) {
+      return static_cast<typename decltype(memptr{T})::class_type *>(nullptr);
+    }
+    friend constexpr auto member_type(accessor_t<S>) {
+      return static_cast<typename decltype(memptr{T})::res_type *>(nullptr);
+    }
+  };
+
+  template<static_string S>
+  using type_accessor_at = std::remove_pointer_t<decltype(contain_type(accessor_t<S>{}))>;
+
+  template<static_string S>
+  using type_result_at = std::remove_pointer_t<decltype(member_type(accessor_t<S>{}))>;
 
 
 #if defined(__clang__)
